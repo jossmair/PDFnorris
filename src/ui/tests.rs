@@ -5083,6 +5083,28 @@ fn pdfnorris_welcome_identity_and_open_button_fit_small_and_large_windows() {
             frame.textures_delta.clear();
             output = Some(frame);
         }
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let decoded = loop {
+            let result = ctx.try_load_image("bytes://pdfnorris-welcome.png", Default::default());
+            if matches!(result, Ok(egui::load::ImagePoll::Pending { .. }))
+                && std::time::Instant::now() < deadline
+            {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                continue;
+            }
+            break result;
+        };
+        match decoded {
+            Ok(egui::load::ImagePoll::Ready { image }) => {
+                assert_eq!(image.size, [1448, 1086]);
+                assert!(
+                    image.pixels.iter().any(|p| p.a() == 0),
+                    "Logo retains transparency"
+                );
+            }
+            Err(error) => panic!("Welcome PNG decode failed: {error}"),
+            _ => panic!("Welcome PNG decoding is pending"),
+        }
         let output = output.unwrap();
         let nodes = &output
             .platform_output

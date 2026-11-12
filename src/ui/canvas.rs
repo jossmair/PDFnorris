@@ -55,9 +55,10 @@ impl App {
                             .layout(egui::Layout::top_down(egui::Align::Center)),
                     );
                     header.add(
-                        egui::Image::new(egui::include_image!(
-                            "../../assets/pdfnorris-welcome.png"
-                        ))
+                        egui::Image::from_bytes(
+                            "bytes://pdfnorris-welcome.png",
+                            include_bytes!("../../assets/pdfnorris-welcome.png").as_slice(),
+                        )
                         .fit_to_exact_size(logo_size)
                         .maintain_aspect_ratio(false)
                         .alt_text(format!(

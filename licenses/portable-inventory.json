@@ -1,7 +1,7 @@
 {
   "target": "x86_64-pc-windows-msvc",
-  "executable_sha256": "9cc606299442a4d00d90e801340617cc4c91999565e56a59b9f9ad2906ecadb6",
-  "cargo_lock_sha256": "0236efa96cfef653cfc4848d02bb22b6dd9de08e221ef6ca94e1a9f078d67b2b",
+  "executable_sha256": "7278e0683f2be12a33aa029889fd3e186a91bc571e0080b8e4a95bf9a8333bd5",
+  "cargo_lock_sha256": "40a62782becf2b2be6f94b27e83cc6cacfc6cc33106d32c2a28b3d6976a121bf",
   "normal_packages": 261,
   "unique_documents": 154,
   "embedded_fonts": [
