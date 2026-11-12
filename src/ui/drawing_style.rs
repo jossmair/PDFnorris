@@ -102,7 +102,7 @@ fn choice(
     }
     if response.has_focus() {
         ui.painter()
-            .rect_stroke(rect, 5., Stroke::new(1., icons::BLUE), StrokeKind::Inside);
+            .rect_stroke(rect, 5., Stroke::new(1., icons::ACCENT), StrokeKind::Inside);
     }
     ui.painter().text(
         rect.left_center() + Vec2::new(7., 0.),

@@ -56,7 +56,7 @@ pub enum Icon {
     OfficeExport,
 }
 pub const INK: Color32 = Color32::from_rgb(30, 49, 73);
-pub const BLUE: Color32 = Color32::from_rgb(55, 113, 249);
+pub const ACCENT: Color32 = Color32::from_rgb(226, 101, 15);
 pub const RAIL: Color32 = Color32::from_rgb(16, 25, 42);
 impl Icon {
     pub fn label(self) -> &'static str {
@@ -218,27 +218,27 @@ pub fn button(
     let face = rect.shrink(2.).translate(Vec2::new(0., -h));
     if active {
         ui.painter()
-            .rect_filled(face.expand(2.), 14., Color32::from_rgb(25, 46, 78));
+            .rect_filled(face.expand(2.), 14., Color32::from_rgb(65, 37, 23));
         ui.painter()
-            .rect_filled(face, 12., Color32::from_rgb(30, 62, 105));
+            .rect_filled(face, 12., Color32::from_rgb(94, 48, 22));
         ui.painter().rect_stroke(
             face,
             12.,
-            Stroke::new(1., Color32::from_rgb(68, 119, 194)),
+            Stroke::new(1., Color32::from_rgb(239, 132, 49)),
             StrokeKind::Inside,
         );
     } else if h > 0. {
         ui.painter().rect_filled(
             face,
             12.,
-            Color32::from_rgba_unmultiplied(90, 125, 178, (h * 40.) as u8),
+            Color32::from_rgba_unmultiplied(239, 132, 49, (h * 40.) as u8),
         );
     }
     if response.has_focus() {
         ui.painter().rect_stroke(
             face.expand(1.),
             12.,
-            Stroke::new(2., Color32::from_rgb(141, 208, 255)),
+            Stroke::new(2., Color32::from_rgb(255, 194, 125)),
             StrokeKind::Inside,
         );
     }
@@ -279,15 +279,15 @@ pub fn chip(ui: &mut egui::Ui, icon: Icon, label: &str, active: bool) -> Respons
             rect,
             8.,
             if active {
-                Color32::from_rgb(219, 231, 255)
+                Color32::from_rgb(255, 226, 197)
             } else {
-                Color32::from_rgba_unmultiplied(120, 151, 200, 28)
+                Color32::from_rgba_unmultiplied(239, 132, 49, 28)
             },
         );
     }
     if response.has_focus() {
         ui.painter()
-            .rect_stroke(rect, 8., Stroke::new(1., BLUE), StrokeKind::Inside);
+            .rect_stroke(rect, 8., Stroke::new(1., ACCENT), StrokeKind::Inside);
     }
     draw(
         ui.painter(),

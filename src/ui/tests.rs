@@ -2437,7 +2437,7 @@ fn edit_sidebar_drags_pages_before_and_after_without_changing_workspace() {
                     assert_eq!(app.page_drag, Some(source));
                     assert!(out.shapes.iter().any(|s| matches!(&s.shape,
                     egui::epaint::Shape::LineSegment { points, stroke }
-                        if stroke.width == 4. && stroke.color == icons::BLUE && points[0].y == points[1].y
+                        if stroke.width == 4. && stroke.color == icons::ACCENT && points[0].y == points[1].y
                 )), "Sidebar insertion line must be horizontal");
                     assert!(out.shapes.iter().any(|s| matches!(&s.shape,
                     egui::epaint::Shape::Mesh(m) if m.texture_id == texture_id && m.calc_bounds().right() > 197. && s.clip_rect.right() > 197.
@@ -3891,7 +3891,7 @@ fn dragging_a_thumbnail_reorders_the_actual_pdf() {
             );
             assert!(out.shapes.iter().any(|s| matches!(&s.shape,
                 egui::epaint::Shape::LineSegment { points, stroke }
-                    if stroke.width == 4. && stroke.color == icons::BLUE && points[0].x > second.x
+                    if stroke.width == 4. && stroke.color == icons::ACCENT && points[0].x > second.x
             )), "A visible insertion marker must precede the drop");
             assert!(
                 !app.editor.as_ref().unwrap().can_undo(),
@@ -4762,7 +4762,7 @@ fn hovering_a_tab_keeps_pages_in_hand_then_inserts_at_the_visible_boundary() {
         let out = input_frame(&ctx, &mut app, vec![egui::Event::PointerMoved(pos)]);
         assert_eq!(out.platform_output.cursor_icon, egui::CursorIcon::Copy);
         assert!(out.shapes.iter().any(|s| matches!(&s.shape,
-            egui::epaint::Shape::LineSegment { stroke, .. } if stroke.width == 4. && stroke.color == icons::BLUE
+            egui::epaint::Shape::LineSegment { stroke, .. } if stroke.width == 4. && stroke.color == icons::ACCENT
         )), "The insertion boundary must be visibly painted");
         input_frame(
             &ctx,
@@ -4929,7 +4929,7 @@ fn edit_objects_are_quiet_until_hover_and_remain_discoverable_and_selectable() {
     );
     assert!(
         selected.shapes.iter().any(|s| matches!(&s.shape,
-            egui::epaint::Shape::Rect(r) if r.stroke.color == icons::BLUE && r.stroke.width >= 1.3
+            egui::epaint::Shape::Rect(r) if r.stroke.color == icons::ACCENT && r.stroke.width >= 1.3
         )),
         "Selected objects keep a clear outline"
     );

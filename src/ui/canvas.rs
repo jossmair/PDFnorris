@@ -746,7 +746,7 @@ impl App {
         ui.painter().rect_stroke(
             outline.expand(1.),
             0.,
-            Stroke::new(1.3, icons::BLUE),
+            Stroke::new(1.3, icons::ACCENT),
             StrokeKind::Outside,
         );
         let corners = [
@@ -758,7 +758,7 @@ impl App {
         for (index, corner) in corners.into_iter().enumerate() {
             ui.painter().circle_filled(corner, 3.5, Color32::WHITE);
             ui.painter()
-                .circle_stroke(corner, 3.5, Stroke::new(1.5, icons::BLUE));
+                .circle_stroke(corner, 3.5, Stroke::new(1.5, icons::ACCENT));
             let response = ui.interact(
                 Rect::from_center_size(corner, Vec2::splat(15.)),
                 egui::Id::new(("resize", s.page, format!("{:?}", s.target), index)),

@@ -476,7 +476,7 @@ impl App {
                 ui.painter().rect_stroke(
                     area,
                     2.,
-                    Stroke::new(1.3, icons::BLUE),
+                    Stroke::new(1.3, icons::ACCENT),
                     StrokeKind::Outside,
                 );
             }
@@ -494,8 +494,12 @@ impl App {
             }
             if !self.marquee.selected.is_empty() {
                 let r = screen(group.translate(delta)).expand(3.);
-                ui.painter()
-                    .rect_stroke(r, 2., Stroke::new(1.5, icons::BLUE), StrokeKind::Outside);
+                ui.painter().rect_stroke(
+                    r,
+                    2.,
+                    Stroke::new(1.5, icons::ACCENT),
+                    StrokeKind::Outside,
+                );
                 for point in [
                     r.left_top(),
                     r.right_top(),
@@ -504,7 +508,7 @@ impl App {
                 ] {
                     ui.painter().circle_filled(point, 3., Color32::WHITE);
                     ui.painter()
-                        .circle_stroke(point, 3., Stroke::new(1.2, icons::BLUE));
+                        .circle_stroke(point, 3., Stroke::new(1.2, icons::ACCENT));
                 }
                 if response.hovered()
                     && ui

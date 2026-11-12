@@ -780,9 +780,9 @@ impl App {
         });
         if let Some(target) = target {
             let painter = ui.painter().with_clip_rect(overview.inner_rect);
-            painter.line_segment(target.marker, Stroke::new(4., icons::BLUE));
+            painter.line_segment(target.marker, Stroke::new(4., icons::ACCENT));
             for p in target.marker {
-                painter.circle_filled(p, 4., icons::BLUE);
+                painter.circle_filled(p, 4., icons::ACCENT);
             }
         }
         if released {
@@ -918,7 +918,7 @@ impl App {
             Stroke::new(
                 if selected { 2. } else { 1. },
                 if selected {
-                    icons::BLUE
+                    icons::ACCENT
                 } else {
                     Color32::from_rgb(214, 222, 235)
                 },
@@ -950,7 +950,7 @@ impl App {
             egui::Align2::CENTER_CENTER,
             label,
             egui::FontId::proportional(12.),
-            if selected { icons::BLUE } else { icons::INK },
+            if selected { icons::ACCENT } else { icons::INK },
         );
     }
 }

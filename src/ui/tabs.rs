@@ -60,7 +60,7 @@ impl App {
                                     egui::RichText::new(label).color(Color32::WHITE).size(12.),
                                 )
                                 .fill(if self.workspace == tab {
-                                    Color32::from_rgb(243, 41, 94)
+                                    Color32::from_rgb(190, 76, 5)
                                 } else {
                                     Color32::TRANSPARENT
                                 })
@@ -187,7 +187,7 @@ impl App {
                                 ui.painter().with_clip_rect(strip.inner_rect).rect_stroke(
                                     rect.shrink(1.),
                                     6.,
-                                    Stroke::new(2., icons::BLUE),
+                                    Stroke::new(2., icons::ACCENT),
                                     StrokeKind::Inside,
                                 );
                                 if ctx.input(|i| {

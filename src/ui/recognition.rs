@@ -1236,7 +1236,7 @@ impl App {
                                         columns[0].painter().rect_stroke(
                                             rect.expand(1.),
                                             1.,
-                                            Stroke::new(0.7, icons::BLUE),
+                                            Stroke::new(0.7, icons::ACCENT),
                                             StrokeKind::Outside,
                                         );
                                         columns[0].painter().text(
@@ -1244,7 +1244,7 @@ impl App {
                                             egui::Align2::LEFT_TOP,
                                             index + 1,
                                             egui::FontId::proportional(8.),
-                                            icons::BLUE,
+                                            icons::ACCENT,
                                         );
                                     }
                                 }
@@ -1315,7 +1315,7 @@ impl App {
                                     })
                                     .color(Color32::WHITE),
                                 )
-                                .fill(icons::BLUE)
+                                .fill(icons::ACCENT)
                                 .corner_radius(7.)
                                 .min_size(Vec2::new(210., 34.)),
                             )

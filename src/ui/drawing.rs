@@ -1123,8 +1123,12 @@ impl App {
                     rect.min + r.max.to_vec2() * self.zoom,
                 )
                 .expand(3.);
-                ui.painter()
-                    .rect_stroke(r, 2., Stroke::new(1., icons::BLUE), StrokeKind::Outside);
+                ui.painter().rect_stroke(
+                    r,
+                    2.,
+                    Stroke::new(1., icons::ACCENT),
+                    StrokeKind::Outside,
+                );
                 let handles = if drawings.len() == 1 && drawings[0].kind == Kind::Line {
                     drawings[0]
                         .view_points(p)
@@ -1137,7 +1141,7 @@ impl App {
                 for point in handles {
                     ui.painter().circle_filled(point, 4., Color32::WHITE);
                     ui.painter()
-                        .circle_stroke(point, 4., Stroke::new(1., icons::BLUE));
+                        .circle_stroke(point, 4., Stroke::new(1., icons::ACCENT));
                 }
             }
         }

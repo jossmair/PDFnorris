@@ -193,7 +193,7 @@ impl App {
                 ui.spacing_mut().interact_size.y = 32.;
                 ui.horizontal(|ui| {
                     let (rect, _) = ui.allocate_exact_size(Vec2::splat(38.), egui::Sense::hover());
-                    icons::draw(ui.painter(), Icon::Print, rect, icons::BLUE);
+                    icons::draw(ui.painter(), Icon::Print, rect, icons::ACCENT);
                     ui.vertical(|ui| {
                         ui.label(
                             egui::RichText::new("Imprimer")
@@ -432,7 +432,7 @@ impl App {
                                         .strong()
                                         .color(Color32::WHITE),
                                 )
-                                .fill(icons::BLUE)
+                                .fill(icons::ACCENT)
                                 .corner_radius(8.)
                                 .min_size(Vec2::new(138., 36.)),
                             )

@@ -350,7 +350,7 @@ impl App {
                                             1.
                                         },
                                         if self.page_selection.contains(page, self.page) {
-                                            icons::BLUE
+                                            icons::ACCENT
                                         } else {
                                             Color32::from_gray(220)
                                         },

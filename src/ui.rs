@@ -364,12 +364,12 @@ impl App {
             .insert(egui::TextStyle::Button, egui::FontId::proportional(12.));
         style.visuals.override_text_color = Some(icons::INK);
         style.visuals.panel_fill = Color32::from_rgb(249, 251, 254);
-        style.visuals.selection.bg_fill = Color32::from_rgb(198, 215, 255);
-        style.visuals.selection.stroke = Stroke::new(1., icons::BLUE);
+        style.visuals.selection.bg_fill = Color32::from_rgb(255, 220, 184);
+        style.visuals.selection.stroke = Stroke::new(1., icons::ACCENT);
         style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(241, 245, 251);
         style.visuals.widgets.inactive.bg_stroke =
             Stroke::new(1., Color32::from_rgb(220, 228, 240));
-        style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(226, 235, 255);
+        style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(255, 235, 214);
         for v in [
             &mut style.visuals.widgets.inactive,
             &mut style.visuals.widgets.hovered,

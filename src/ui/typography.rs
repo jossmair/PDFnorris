@@ -656,7 +656,7 @@ impl App {
                         ui.painter().rect_stroke(
                             r,
                             8.,
-                            Stroke::new(2., icons::BLUE),
+                            Stroke::new(2., icons::ACCENT),
                             StrokeKind::Outside,
                         );
                     }
