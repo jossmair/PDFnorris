@@ -5090,37 +5090,22 @@ fn pdfnorris_welcome_identity_and_open_button_fit_small_and_large_windows() {
             .as_ref()
             .unwrap()
             .nodes;
-        assert!(
-            nodes
-                .iter()
-                .any(|(_, n)| n.label().or(n.value()) == Some(pdfnorris::APP_NAME))
-        );
-        assert!(nodes.iter().any(|(_, n)| {
-            n.label()
-                .or(n.value())
-                .is_some_and(|s| s.contains(pdfnorris::SLOGAN))
-        }));
         let signature = nodes
             .iter()
-            .find(|(_, n)| n.label().or(n.value()) == Some(pdfnorris::APP_NAME))
-            .unwrap()
+            .find(|(_, n)| {
+                n.label().or(n.value()).is_some_and(|s| {
+                    s.contains(pdfnorris::APP_NAME) && s.contains(pdfnorris::SLOGAN)
+                })
+            })
+            .expect("Welcome logo remains accessible")
             .1
             .bounds()
             .unwrap();
         assert!(((signature.x0 + signature.x1) / 2. - f64::from(app.canvas.center().x)).abs() < 2.);
         assert!(signature.y0 < f64::from(app.canvas.top()) + 30.);
-        let slogan = nodes
-            .iter()
-            .find(|(_, n)| {
-                n.label()
-                    .or(n.value())
-                    .is_some_and(|s| s.contains(pdfnorris::SLOGAN))
-            })
-            .unwrap()
-            .1
-            .bounds()
-            .unwrap();
-        assert!(slogan.y0 - signature.y1 < 12.);
+        assert!(
+            ((signature.x1 - signature.x0) / (signature.y1 - signature.y0) - 4. / 3.).abs() < 0.01
+        );
         assert!(!nodes.iter().any(|(_, n)| matches!(
             n.label().or(n.value()),
             Some("Un logiciel de la suite Ergonatus" | "V1.00")

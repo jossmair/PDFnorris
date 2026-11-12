@@ -43,52 +43,29 @@ impl App {
                 self.canvas = ui.max_rect();
                 let Some(e) = &self.editor else {
                     let welcome = ui.max_rect();
+                    let logo_height = (welcome.height() * 0.28).clamp(120., 240.);
+                    let logo_size = Vec2::new(logo_height * 4. / 3., logo_height);
                     let signature = Rect::from_min_size(
-                        Pos2::new(welcome.center().x - 230., welcome.top() + 16.),
-                        Vec2::new(460., 100.),
+                        Pos2::new(welcome.center().x - logo_size.x / 2., welcome.top() + 12.),
+                        logo_size,
                     );
                     let mut header = ui.new_child(
                         egui::UiBuilder::new()
                             .max_rect(signature)
                             .layout(egui::Layout::top_down(egui::Align::Center)),
                     );
-                    {
-                        let ui = &mut header;
-                        ui.spacing_mut().item_spacing.y = 2.;
-                        let mut name = egui::text::LayoutJob::default();
-                        name.append(
-                            "PDF",
-                            0.,
-                            egui::TextFormat {
-                                font_id: egui::FontId::new(
-                                    40.,
-                                    egui::FontFamily::Name("Interface-Bold".into()),
-                                ),
-                                color: Color32::BLACK,
-                                ..Default::default()
-                            },
-                        );
-                        name.append(
-                            "norris",
-                            0.,
-                            egui::TextFormat {
-                                font_id: egui::FontId::new(
-                                    40.,
-                                    egui::FontFamily::Name("Interface-Bold".into()),
-                                ),
-                                color: Color32::from_rgb(255, 108, 0),
-                                ..Default::default()
-                            },
-                        );
-                        ui.label(name);
-                        ui.add_space(2.);
-                        ui.label(
-                            egui::RichText::new(format!("« {} »", pdfnorris::SLOGAN))
-                                .size(18.)
-                                .family(egui::FontFamily::Name("Interface".into()))
-                                .color(Color32::BLACK),
-                        );
-                    }
+                    header.add(
+                        egui::Image::new(egui::include_image!(
+                            "../../assets/pdfnorris-welcome.png"
+                        ))
+                        .fit_to_exact_size(logo_size)
+                        .maintain_aspect_ratio(false)
+                        .alt_text(format!(
+                            "{} — {}",
+                            pdfnorris::APP_NAME,
+                            pdfnorris::SLOGAN
+                        )),
+                    );
                     ui.vertical_centered(|ui| {
                         ui.add_space(((welcome.height() - 170.) / 2.).max(12.));
                         let r = ui
