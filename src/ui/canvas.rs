@@ -42,8 +42,18 @@ impl App {
                 let had_viewport = self.canvas.is_positive();
                 self.canvas = ui.max_rect();
                 let Some(e) = &self.editor else {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(((ui.available_height() - 380.) / 2.).max(12.));
+                    let welcome = ui.max_rect();
+                    let signature = Rect::from_min_size(
+                        Pos2::new(welcome.right() - 370., welcome.bottom() - 112.),
+                        Vec2::new(350., 92.),
+                    );
+                    let mut footer = ui.new_child(
+                        egui::UiBuilder::new()
+                            .max_rect(signature)
+                            .layout(egui::Layout::top_down(egui::Align::Center)),
+                    );
+                    {
+                        let ui = &mut footer;
                         let mut name = egui::text::LayoutJob::default();
                         name.append(
                             "PDF",
@@ -71,19 +81,9 @@ impl App {
                                 .strong()
                                 .color(Color32::BLACK),
                         );
-                        ui.add_space(8.);
-                        ui.label(
-                            egui::RichText::new("Un logiciel de la suite Ergonatus")
-                                .size(13.)
-                                .color(Color32::from_rgb(63, 80, 105)),
-                        );
-                        ui.add_space(8.);
-                        ui.label(
-                            egui::RichText::new(pdfnorris::DISPLAY_VERSION)
-                                .size(11.)
-                                .color(Color32::from_rgb(63, 80, 105)),
-                        );
-                        ui.add_space(20.);
+                    }
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(((welcome.height() - 170.) / 2.).max(12.));
                         let r = ui
                             .allocate_exact_size(Vec2::splat(48.), egui::Sense::hover())
                             .0;

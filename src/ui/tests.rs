@@ -5100,6 +5100,27 @@ fn pdfnorris_welcome_identity_and_open_button_fit_small_and_large_windows() {
                 .or(n.value())
                 .is_some_and(|s| s.contains(pdfnorris::SLOGAN))
         }));
+        let signature = nodes
+            .iter()
+            .find(|(_, n)| n.label().or(n.value()) == Some(pdfnorris::APP_NAME))
+            .unwrap()
+            .1
+            .bounds()
+            .unwrap();
+        assert!(signature.x0 > f64::from(width) * 0.5 && signature.y0 > f64::from(height) * 0.7);
+        assert!(!nodes.iter().any(|(_, n)| matches!(
+            n.label().or(n.value()),
+            Some("Un logiciel de la suite Ergonatus" | "V1.00")
+        )));
+        let heading = nodes
+            .iter()
+            .find(|(_, n)| n.label().or(n.value()) == Some("Ouvrir un document PDF"))
+            .unwrap()
+            .1
+            .bounds()
+            .unwrap();
+        assert!(((heading.x0 + heading.x1) / 2. - f64::from(app.canvas.center().x)).abs() < 20.);
+        assert!(((heading.y0 + heading.y1) / 2. - f64::from(app.canvas.center().y)).abs() < 40.);
         assert!(!app.work.show_recovery);
         assert!(
             !nodes
