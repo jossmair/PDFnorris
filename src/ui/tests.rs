@@ -5107,7 +5107,20 @@ fn pdfnorris_welcome_identity_and_open_button_fit_small_and_large_windows() {
             .1
             .bounds()
             .unwrap();
-        assert!(signature.x0 > f64::from(width) * 0.5 && signature.y0 > f64::from(height) * 0.7);
+        assert!(((signature.x0 + signature.x1) / 2. - f64::from(app.canvas.center().x)).abs() < 2.);
+        assert!(signature.y0 < f64::from(app.canvas.top()) + 30.);
+        let slogan = nodes
+            .iter()
+            .find(|(_, n)| {
+                n.label()
+                    .or(n.value())
+                    .is_some_and(|s| s.contains(pdfnorris::SLOGAN))
+            })
+            .unwrap()
+            .1
+            .bounds()
+            .unwrap();
+        assert!(slogan.y0 - signature.y1 < 12.);
         assert!(!nodes.iter().any(|(_, n)| matches!(
             n.label().or(n.value()),
             Some("Un logiciel de la suite Ergonatus" | "V1.00")

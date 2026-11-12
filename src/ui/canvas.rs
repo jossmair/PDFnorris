@@ -44,22 +44,26 @@ impl App {
                 let Some(e) = &self.editor else {
                     let welcome = ui.max_rect();
                     let signature = Rect::from_min_size(
-                        Pos2::new(welcome.right() - 370., welcome.bottom() - 112.),
-                        Vec2::new(350., 92.),
+                        Pos2::new(welcome.center().x - 230., welcome.top() + 16.),
+                        Vec2::new(460., 100.),
                     );
-                    let mut footer = ui.new_child(
+                    let mut header = ui.new_child(
                         egui::UiBuilder::new()
                             .max_rect(signature)
                             .layout(egui::Layout::top_down(egui::Align::Center)),
                     );
                     {
-                        let ui = &mut footer;
+                        let ui = &mut header;
+                        ui.spacing_mut().item_spacing.y = 2.;
                         let mut name = egui::text::LayoutJob::default();
                         name.append(
                             "PDF",
                             0.,
                             egui::TextFormat {
-                                font_id: egui::FontId::proportional(32.),
+                                font_id: egui::FontId::new(
+                                    40.,
+                                    egui::FontFamily::Name("Interface-Bold".into()),
+                                ),
                                 color: Color32::BLACK,
                                 ..Default::default()
                             },
@@ -68,17 +72,20 @@ impl App {
                             "norris",
                             0.,
                             egui::TextFormat {
-                                font_id: egui::FontId::proportional(32.),
+                                font_id: egui::FontId::new(
+                                    40.,
+                                    egui::FontFamily::Name("Interface-Bold".into()),
+                                ),
                                 color: Color32::from_rgb(255, 108, 0),
                                 ..Default::default()
                             },
                         );
                         ui.label(name);
-                        ui.add_space(12.);
+                        ui.add_space(2.);
                         ui.label(
                             egui::RichText::new(format!("« {} »", pdfnorris::SLOGAN))
-                                .size(20.)
-                                .strong()
+                                .size(18.)
+                                .family(egui::FontFamily::Name("Interface".into()))
                                 .color(Color32::BLACK),
                         );
                     }
