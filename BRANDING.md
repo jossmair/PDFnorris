@@ -14,3 +14,5 @@ ouvrir les documents et brouillons créés avec PDFinator.
 Les licences et les attributions des composants restent inchangées.
 
 Les pictogrammes utilisent une palette orange, abricot et crème. Les états actifs, le survol et le focus utilisent le même accent orange. Les couleurs du document restent indépendantes de ce thème.
+
+Les 58 pictogrammes sont dessinés sur une grille 32 px avec un trait régulier, des faces orange et anthracite, des reflets et une ombre courte.

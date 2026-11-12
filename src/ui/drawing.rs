@@ -223,7 +223,13 @@ impl App {
             .iter()
             .map(|i| (i.target, None))
             .collect::<Vec<_>>();
-        let result = if self.drawing.linked_text {
+        let result = if self.drawing.linked_text
+            || self
+                .drawing
+                .selected
+                .iter()
+                .any(|i| i.drawing.kind == Kind::Table)
+        {
             self.editor.as_mut().unwrap().delete_drawing_table(
                 page,
                 &changes,
@@ -299,6 +305,31 @@ impl App {
         }
     }
     /// In Modifier, vectors use the ordinary selection tool, alongside text/images.
+    pub(super) fn table_cell(&mut self, page: usize, p: &PageInfo, point: Pos2) -> Option<Rect> {
+        let items = self.drawing_items(page).ok()?;
+        let table = items
+            .iter()
+            .filter(|i| i.drawing.kind == Kind::Table && bounds(&i.drawing, p).contains(point))
+            .min_by(|a, b| {
+                bounds(&a.drawing, p)
+                    .area()
+                    .total_cmp(&bounds(&b.drawing, p).area())
+            })?;
+        let r = bounds(&table.drawing, p);
+        let size = Vec2::new(
+            r.width() / f32::from(table.drawing.columns),
+            r.height() / f32::from(table.drawing.rows),
+        );
+        let column = ((point.x - r.left()) / size.x)
+            .floor()
+            .min(f32::from(table.drawing.columns - 1));
+        let row = ((point.y - r.top()) / size.y)
+            .floor()
+            .min(f32::from(table.drawing.rows - 1));
+        let cell = Rect::from_min_size(r.min + Vec2::new(column * size.x, row * size.y), size)
+            .shrink((size.x.min(size.y) * 0.08).min(4.));
+        cell.contains(point).then_some(cell)
+    }
     pub(super) fn drawing_capture(
         &mut self,
         ui: &egui::Ui,
@@ -738,7 +769,12 @@ impl App {
                 old == a.drawing
             })
         });
-        let result = if self.drawing.linked_text
+        let result = if (self.drawing.linked_text
+            || self
+                .drawing
+                .selected
+                .iter()
+                .any(|i| i.drawing.kind == Kind::Table))
             && let Some(delta) = translation
             && delta != [0., 0.]
         {

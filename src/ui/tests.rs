@@ -299,7 +299,12 @@ fn sheet_origin(app: &App) -> Pos2 {
     Pos2::new(
         app.canvas.left() + ((app.canvas.width() - 18. - p.width * app.zoom) / 2.).max(0.)
             - app.scroll_offset.x,
-        app.canvas.top() - app.scroll_offset.y,
+        app.canvas.top() - app.scroll_offset.y
+            + if app.editor.as_ref().unwrap().info.pages.len() == 1 {
+                ((app.canvas.height() - p.height * app.zoom) / 2.).max(0.)
+            } else {
+                0.
+            },
     )
 }
 
@@ -5159,4 +5164,215 @@ fn pdfnorris_welcome_identity_and_open_button_fit_small_and_large_windows() {
             "Open button must stay visible at {width}x{height}: {button:?}"
         );
     }
+}
+
+#[test]
+fn middle_button_temporarily_pans_without_changing_tools_or_document() {
+    for tool in [
+        Tool::Select,
+        Tool::Hand,
+        Tool::Move,
+        Tool::Edit,
+        Tool::Text,
+        Tool::Image,
+        Tool::Draw,
+        Tool::Highlight,
+        Tool::Comment,
+    ] {
+        let (ctx, mut app) = setup();
+        app.fit = Fit::Manual;
+        app.zoom = 2.;
+        app.thumbnails = false;
+        app.scroll_offset = Vec2::new(150., 200.);
+        app.workspace = Workspace::Edit;
+        app.tool = tool;
+        for _ in 0..2 {
+            let mut out = ctx.run_ui(Default::default(), |ui| app.frame_ui(ui));
+            out.textures_delta.clear();
+        }
+        let before = app.editor.as_ref().unwrap().bytes.clone();
+        let offset = app.scroll_offset;
+        let start = app.canvas.center();
+        let end = start - Vec2::new(70., 95.);
+        for (stage, events) in [
+            vec![
+                egui::Event::PointerMoved(start),
+                egui::Event::PointerButton {
+                    pos: start,
+                    button: egui::PointerButton::Middle,
+                    pressed: true,
+                    modifiers: Modifiers::NONE,
+                },
+            ],
+            vec![egui::Event::PointerMoved(end)],
+            vec![egui::Event::PointerButton {
+                pos: end,
+                button: egui::PointerButton::Middle,
+                pressed: false,
+                modifiers: Modifiers::NONE,
+            }],
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut out = ctx.run_ui(
+                egui::RawInput {
+                    events,
+                    ..Default::default()
+                },
+                |ui| app.frame_ui(ui),
+            );
+            out.textures_delta.clear();
+            if stage == 1 {
+                assert!(
+                    (app.scroll_offset.x - offset.x - 70.).abs() < 1.,
+                    "Horizontal pan: {:?}",
+                    app.scroll_offset
+                );
+                assert!(
+                    (app.scroll_offset.y - offset.y - 95.).abs() < 1.,
+                    "Vertical pan: {:?}",
+                    app.scroll_offset
+                );
+                assert_eq!(out.platform_output.cursor_icon, egui::CursorIcon::Grabbing);
+            }
+        }
+        assert_eq!(app.editor.as_ref().unwrap().bytes, before);
+        assert!(app.selected.is_none() && app.text_selection.is_none());
+        assert!(!app.editor.as_ref().unwrap().can_undo());
+
+        assert!(app.tool == tool, "Middle pan preserves the active tool");
+    }
+}
+
+#[test]
+fn single_page_centers_vertically_only_when_it_fits_the_canvas() {
+    for count in [1, 2] {
+        for zoom in [0.5, 2.] {
+            let (ctx, mut app) = setup();
+            let doc = pdfcraft_create::blank(842., 595., count).unwrap();
+            app.editor = Some(
+                Editor::from_bytes(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap())
+                    .unwrap(),
+            );
+            app.fit = Fit::Manual;
+            app.zoom = zoom;
+            app.jump = None;
+            let mut output = input_frame(&ctx, &mut app, vec![]);
+            for _ in 0..2 {
+                output = input_frame(&ctx, &mut app, vec![]);
+            }
+            let rect = output
+                .shapes
+                .iter()
+                .find_map(|s| match &s.shape {
+                    egui::Shape::Rect(r)
+                        if r.fill == Color32::WHITE
+                            && (r.rect.width() - 842. * zoom).abs() < 1.
+                            && (r.rect.height() - 595. * zoom).abs() < 1. =>
+                    {
+                        Some(r.rect)
+                    }
+                    _ => None,
+                })
+                .expect("Rendered PDF page");
+            if count == 1 && 595. * zoom < app.canvas.height() {
+                assert!((rect.center().y - app.canvas.center().y).abs() < 1.);
+            } else {
+                assert!((rect.top() - app.canvas.top()).abs() < 1.);
+            }
+        }
+    }
+}
+
+#[test]
+fn drawn_table_cells_accept_independent_editable_text_and_survive_reopening() {
+    use pdfnorris::drawing::{Drawing, Kind};
+    let (ctx, mut app) = setup();
+    app.workspace = Workspace::Edit;
+    app.tool = Tool::Draw;
+    app.fit = Fit::Manual;
+    app.zoom = 0.75;
+    let p = app.editor.as_ref().unwrap().info.pages[0].clone();
+    let table = Drawing::from_view(
+        &p,
+        Kind::Table,
+        [70., 100.],
+        [470., 300.],
+        1.5,
+        [0.; 3],
+        2,
+        2,
+    );
+    app.editor.as_mut().unwrap().add_drawing(0, table).unwrap();
+    app.refresh(0);
+    for (point, text) in [
+        (Vec2::new(170., 150.), "Cellule une"),
+        (Vec2::new(370., 250.), "Cellule quatre"),
+    ] {
+        for _ in 0..3 {
+            input_frame(&ctx, &mut app, vec![]);
+        }
+        let at = sheet_origin(&app) + point * app.zoom;
+        for _ in 0..1 {
+            input_frame(
+                &ctx,
+                &mut app,
+                vec![
+                    egui::Event::PointerMoved(at),
+                    pointer_button(at, egui::PointerButton::Primary, true),
+                ],
+            );
+            input_frame(
+                &ctx,
+                &mut app,
+                vec![pointer_button(at, egui::PointerButton::Primary, false)],
+            );
+        }
+        assert!(
+            app.inline.is_some(),
+            "Cell double-click opens text editor: {:?}, point={point:?}, tool={:?}, tables={:?}",
+            app.message,
+            app.tool,
+            app.editor
+                .as_ref()
+                .unwrap()
+                .drawings(0)
+                .unwrap()
+                .iter()
+                .map(|i| i.drawing.kind)
+                .collect::<Vec<_>>()
+        );
+        for _ in 0..200 {
+            input_frame(&ctx, &mut app, vec![]);
+            if app
+                .inline
+                .as_ref()
+                .is_some_and(|i| i.screen.is_positive() && !i.focus)
+            {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        input_frame(&ctx, &mut app, vec![egui::Event::Text(text.into())]);
+        assert!(
+            app.inline.as_ref().unwrap().selection.draft.contains(text),
+            "Typing must reach the cell: {:?}",
+            app.inline.as_ref().unwrap().selection.draft
+        );
+        assert!(app.finish_text(), "{:?}", app.message);
+    }
+    let reopened = Editor::from_bytes(app.editor.as_ref().unwrap().bytes.as_ref().clone()).unwrap();
+    let text = reopened.text(0).unwrap().plain_text();
+    assert!(
+        text.contains("Cellule une") && text.contains("Cellule quatre"),
+        "{text}"
+    );
+    assert!(
+        reopened
+            .drawings(0)
+            .unwrap()
+            .iter()
+            .any(|i| i.drawing.kind == Kind::Table)
+    );
 }

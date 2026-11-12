@@ -1,6 +1,6 @@
 {
   "target": "x86_64-pc-windows-msvc",
-  "executable_sha256": "67a05954aee6534ec0e054acc7a2b740a215c572188c2de39c429bb6d0324c83",
+  "executable_sha256": "80e6259df823f1c71bd9cfbbc2e585aada45918951a2e0739a129d5610b16d58",
   "cargo_lock_sha256": "40a62782becf2b2be6f94b27e83cc6cacfc6cc33106d32c2a28b3d6976a121bf",
   "normal_packages": 261,
   "unique_documents": 154,

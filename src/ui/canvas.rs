@@ -15,7 +15,7 @@ impl App {
             self.scroll_offset = zoom_offset(
                 self.scroll_offset,
                 self.canvas.size() / 2.,
-                self.canvas.width(),
+                self.canvas.size(),
                 old,
                 new,
                 &pages,
@@ -111,7 +111,7 @@ impl App {
                         self.scroll_offset.y = zoom_offset(
                             self.scroll_offset,
                             Vec2::new(width / 2., ui.available_height() / 2.),
-                            width,
+                            ui.available_size(),
                             old_zoom,
                             self.zoom,
                             &sizes,
@@ -132,14 +132,40 @@ impl App {
                             - ui.max_rect().min;
                         let sizes: Vec<_> =
                             pages.iter().map(|p| Vec2::new(p.width, p.height)).collect();
-                        self.scroll_offset =
-                            zoom_offset(self.scroll_offset, pointer, width, old, self.zoom, &sizes);
+                        self.scroll_offset = zoom_offset(
+                            self.scroll_offset,
+                            pointer,
+                            ui.available_size(),
+                            old,
+                            self.zoom,
+                            &sizes,
+                        );
                         ctx.input_mut(|i| i.smooth_scroll_delta = Vec2::ZERO);
                     }
                 }
+                let middle_origin = ctx.input(|i| {
+                    i.pointer
+                        .button_down(egui::PointerButton::Middle)
+                        .then(|| i.pointer.press_origin())
+                        .flatten()
+                });
+                let middle_pan = !self.printing.open
+                    && self.recognition.is_none()
+                    && middle_origin.is_some_and(|p| {
+                        ui.max_rect().contains(p) && ctx.layer_id_at(p) == Some(ui.layer_id())
+                    });
+                let single_page_padding = if pages.len() == 1 {
+                    ((ui.available_height() - pages[0].height * self.zoom) / 2.).max(0.)
+                } else {
+                    0.
+                };
+                if middle_pan {
+                    self.scroll_offset =
+                        (self.scroll_offset - ctx.input(|i| i.pointer.delta())).max(Vec2::ZERO);
+                }
                 let scroll = egui::ScrollArea::both()
                     .id_salt("document-scroll")
-                    .scroll_source(if self.tool == Tool::Hand {
+                    .scroll_source(if self.tool == Tool::Hand && !middle_pan {
                         egui::scroll_area::ScrollSource::ALL
                     } else {
                         egui::scroll_area::ScrollSource::default()
@@ -152,6 +178,7 @@ impl App {
                         // Match the fixed 20pt page gap used by pointer-anchored zoom.
                         ui.spacing_mut().item_spacing.y = 0.;
                         ui.set_min_width(width - 1.);
+                        ui.add_space(single_page_padding);
                         for (page, p) in pages.iter().enumerate() {
                             ui.horizontal(|ui| {
                                 ui.add_space(((width - 18. - p.width * self.zoom) / 2.).max(0.));
@@ -173,7 +200,9 @@ impl App {
                                     }
                                 }
                             });
-                            ui.add_space(20.);
+                            if pages.len() > 1 {
+                                ui.add_space(20.);
+                            }
                         }
                     });
                 self.scroll_offset = scroll.state.offset;
@@ -256,10 +285,13 @@ impl App {
                 {
                     ctx.set_cursor_icon(egui::CursorIcon::Move);
                 }
+                if middle_pan {
+                    ctx.set_cursor_icon(egui::CursorIcon::Grabbing);
+                }
                 let gray_click = ctx
                     .input(|i| {
                         i.pointer
-                            .any_pressed()
+                            .button_pressed(egui::PointerButton::Primary)
                             .then(|| i.pointer.interact_pos())
                             .flatten()
                     })
@@ -359,7 +391,9 @@ impl App {
         let size = Vec2::new(p.width, p.height);
         let (rect, response) = ui.allocate_exact_size(
             size * self.zoom,
-            if self.tool == Tool::Hand {
+            if self.tool == Tool::Hand
+                || ui.input(|i| i.pointer.button_down(egui::PointerButton::Middle))
+            {
                 egui::Sense::click()
             } else {
                 egui::Sense::click_and_drag()
@@ -464,6 +498,72 @@ impl App {
         self.image_page_menu(ui, page, p, rect, &response);
         if self.image_crop_canvas(ui, page, rect) {
             return true;
+        }
+        if self.workspace == Workspace::Edit
+            && matches!(
+                self.tool,
+                Tool::Draw | Tool::Select | Tool::Edit | Tool::Text
+            )
+            && (response.double_clicked()
+                || (response.clicked() && self.tool != Tool::Select && self.drawing.mode.is_none()))
+            && let Some(pos) = response.interact_pointer_pos()
+        {
+            let q = (pos - rect.min) / self.zoom;
+            let point = Pos2::new(q.x, q.y);
+            if let Some(cell) = self.table_cell(page, p, point) {
+                let existing = self
+                    .hit(page, p, point)
+                    .filter(|s| !s.is_image)
+                    .or_else(|| {
+                        let target = self
+                            .objects
+                            .get(&page)?
+                            .iter()
+                            .find(|o| {
+                                let center = p.user_to_view(
+                                    ((o.rect[0] + o.rect[2]) / 2.) as f32,
+                                    ((o.rect[1] + o.rect[3]) / 2.) as f32,
+                                );
+                                (o.target.kind == ObjectKind::Text
+                                    || (o.target.kind == ObjectKind::Added
+                                        && o.content_type == "text"))
+                                    && cell.contains(Pos2::new(center[0], center[1]))
+                            })?
+                            .target;
+                        self.selection_for(
+                            page,
+                            match target.kind {
+                                ObjectKind::Text => Target::Block(target.index),
+                                ObjectKind::Added => Target::Added(target.index),
+                                ObjectKind::Image => return None,
+                            },
+                        )
+                    });
+                let selection = existing.unwrap_or_else(|| {
+                    Selection::text(
+                        page,
+                        Target::New,
+                        [
+                            cell.left() as f64,
+                            (p.height - cell.bottom()) as f64,
+                            cell.right() as f64,
+                            (p.height - cell.top()) as f64,
+                        ],
+                        String::new(),
+                        (cell.height() as f64 / 2.).clamp(6., 14.),
+                        [0.; 3],
+                        false,
+                    )
+                });
+                self.begin_text(ui.ctx(), selection);
+                if self.inline.is_some() {
+                    self.tool = Tool::Edit;
+                    self.drawing.selected.clear();
+                    self.drawing.mode = None;
+                    self.marquee.clear();
+                }
+                return true;
+            }
         }
         if self.workspace == Workspace::Edit && self.tool == Tool::Select {
             self.mixed_canvas(ui, page, p, rect, &response);
@@ -1052,14 +1152,23 @@ impl App {
 fn zoom_offset(
     offset: Vec2,
     pointer: Vec2,
-    width: f32,
+    viewport: Vec2,
     old: f32,
     new: f32,
     pages: &[Vec2],
 ) -> Vec2 {
+    let width = viewport.x;
     let y = offset.y + pointer.y;
-    let mut old_top = 0.;
-    let mut new_top = 0.;
+    let mut old_top = if pages.len() == 1 {
+        ((viewport.y - pages[0].y * old) / 2.).max(0.)
+    } else {
+        0.
+    };
+    let mut new_top = if pages.len() == 1 {
+        ((viewport.y - pages[0].y * new) / 2.).max(0.)
+    } else {
+        0.
+    };
     for p in pages {
         if y <= old_top + p.y * old + 20. {
             let within = (y - old_top).min(p.y * old);
@@ -1121,12 +1230,12 @@ mod tests {
         let pages = [Vec2::new(595., 842.); 3];
         let pointer = Vec2::new(300., 200.);
         let offset = Vec2::new(0., 1000.);
-        let next = zoom_offset(offset, pointer, 800., 1., 2., &pages);
+        let next = zoom_offset(offset, pointer, Vec2::new(800., 0.), 1., 2., &pages);
         // Page 2 starts at y=862, the pointer is 338pt into its contents.
         assert!((next.y + pointer.y - (842. * 2. + 20. + 338. * 2.)).abs() < 0.01);
         let old_left = (800. - 18. - 595.) / 2.;
         assert!(((next.x + pointer.x) / 2. - (pointer.x - old_left)).abs() < 0.01);
-        let back = zoom_offset(next, pointer, 800., 2., 1., &pages);
+        let back = zoom_offset(next, pointer, Vec2::new(800., 0.), 2., 1., &pages);
         assert!((back - offset).length() < 0.01);
     }
     #[test]
