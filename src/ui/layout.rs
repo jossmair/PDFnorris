@@ -728,11 +728,14 @@ impl App {
             self.open(path);
         }
         // Outside clicks commit the in-place editor, while property controls keep it active.
-        if self.inline.as_ref().is_some_and(|i| !i.committed) && self.drag.is_none() {
+        if !self.work.discard_dialog
+            && self.inline.as_ref().is_some_and(|i| !i.committed)
+            && self.drag.is_none()
+        {
             let outside = ctx
                 .input(|i| {
                     i.pointer
-                        .any_pressed()
+                        .button_pressed(egui::PointerButton::Primary)
                         .then(|| i.pointer.interact_pos())
                         .flatten()
                 })
@@ -829,6 +832,7 @@ impl App {
         self.recognition_dialog(&ctx);
         self.observe_recovery(&ctx);
         self.recovery_dialog(&ctx);
+        self.discard_dialog(&ctx);
         if self.printing.busy {
             ctx.request_repaint_after(std::time::Duration::from_millis(40));
         }

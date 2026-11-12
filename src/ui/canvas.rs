@@ -1,6 +1,8 @@
 use super::*;
 impl App {
     pub(super) fn zoom_document(&mut self, zoom: f32) {
+        self.scroll_offset = (self.scroll_offset - self.pan_margin).max(Vec2::ZERO);
+        self.pan_margin = Vec2::ZERO;
         let old = self.zoom;
         let new = zoom.clamp(0.2, 4.);
         if let Some(editor) = &self.editor
@@ -91,6 +93,10 @@ impl App {
                 };
                 let pages = e.info.pages.clone();
                 let width = ui.available_width();
+                if !matches!(self.fit, Fit::Manual) && self.pan_margin != Vec2::ZERO {
+                    self.scroll_offset = (self.scroll_offset - self.pan_margin).max(Vec2::ZERO);
+                    self.pan_margin = Vec2::ZERO;
+                }
                 let old_zoom = self.zoom;
                 if let Some(p) = pages.get(self.page) {
                     match self.fit {
@@ -143,17 +149,30 @@ impl App {
                         ctx.input_mut(|i| i.smooth_scroll_delta = Vec2::ZERO);
                     }
                 }
-                let middle_origin = ctx.input(|i| {
-                    i.pointer
-                        .button_down(egui::PointerButton::Middle)
-                        .then(|| i.pointer.press_origin())
-                        .flatten()
+                let (middle_down, middle_pressed, pos) = ctx.input(|i| {
+                    (
+                        i.pointer.button_down(egui::PointerButton::Middle),
+                        i.pointer.button_pressed(egui::PointerButton::Middle),
+                        i.pointer.interact_pos(),
+                    )
                 });
-                let middle_pan = !self.printing.open
+                if !middle_down {
+                    self.middle_panning = false;
+                }
+                if middle_pressed
+                    && !self.printing.open
+                    && !self.work.discard_dialog
                     && self.recognition.is_none()
-                    && middle_origin.is_some_and(|p| {
-                        ui.max_rect().contains(p) && ctx.layer_id_at(p) == Some(ui.layer_id())
-                    });
+                    && pos.is_some_and(|p| ui.max_rect().contains(p))
+                {
+                    self.middle_panning = true;
+                    self.fit = Fit::Manual;
+                    if self.pan_margin == Vec2::ZERO {
+                        self.pan_margin = ui.available_size();
+                        self.scroll_offset += self.pan_margin;
+                    }
+                }
+                let middle_pan = self.middle_panning && middle_down;
                 let single_page_padding = if pages.len() == 1 {
                     ((ui.available_height() - pages[0].height * self.zoom) / 2.).max(0.)
                 } else {
@@ -163,6 +182,11 @@ impl App {
                     self.scroll_offset =
                         (self.scroll_offset - ctx.input(|i| i.pointer.delta())).max(Vec2::ZERO);
                 }
+                let viewport_height = ui.available_height();
+                let document_height: f32 = pages
+                    .iter()
+                    .map(|p| p.height * self.zoom + if pages.len() > 1 { 20. } else { 0. })
+                    .sum();
                 let scroll = egui::ScrollArea::both()
                     .id_salt("document-scroll")
                     .scroll_source(if self.tool == Tool::Hand && !middle_pan {
@@ -177,11 +201,18 @@ impl App {
                     .show(ui, |ui| {
                         // Match the fixed 20pt page gap used by pointer-anchored zoom.
                         ui.spacing_mut().item_spacing.y = 0.;
-                        ui.set_min_width(width - 1.);
-                        ui.add_space(single_page_padding);
+                        ui.set_min_size(Vec2::new(
+                            width - 1. + 2. * self.pan_margin.x,
+                            (document_height + 2. * single_page_padding).max(viewport_height)
+                                + 2. * self.pan_margin.y,
+                        ));
+                        ui.add_space(single_page_padding + self.pan_margin.y);
                         for (page, p) in pages.iter().enumerate() {
                             ui.horizontal(|ui| {
-                                ui.add_space(((width - 18. - p.width * self.zoom) / 2.).max(0.));
+                                ui.add_space(
+                                    self.pan_margin.x
+                                        + ((width - 18. - p.width * self.zoom) / 2.).max(0.),
+                                );
                                 if self.page_ui(ui, page, p, &mut surfaces) {
                                     visible.push(page);
                                     if let Some(pos) = ctx.pointer_hover_pos().filter(|pos| {

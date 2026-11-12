@@ -18,3 +18,7 @@ Les marqueurs internes des anciens documents et les brouillons de récupération
 - Maintenir le bouton central de la souris déplace temporairement la vue, sans changer l’outil actif.
 - Une page isolée est centrée verticalement lorsqu’elle tient dans la vue.
 - Dans Modifier/Dessin, cliquer dans une cellule d’un tableau dessiné permet d’y saisir du texte ; les bordures restent sélectionnables.
+
+- Correctif du déplacement au bouton central pour les pages entièrement visibles, sans quitter l’outil courant.
+- Correctif du rendu des traits horizontaux (réduction de fenêtre et zoom moins).
+- Confirmation de fermeture intégrée au thème de l’application, avec sauvegarde, abandon explicite ou annulation.

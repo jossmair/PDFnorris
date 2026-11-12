@@ -391,3 +391,24 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[test]
+fn horizontal_controls_keep_visible_pixels_with_relief_effects() {
+    for bytes in [
+        include_bytes!("../assets/icons/minimize.svg").as_slice(),
+        include_bytes!("../assets/icons/minus.svg").as_slice(),
+    ] {
+        let tree = resvg::usvg::Tree::from_data(bytes, &Default::default()).unwrap();
+        let mut pixels = resvg::tiny_skia::Pixmap::new(32, 32).unwrap();
+        resvg::render(
+            &tree,
+            resvg::tiny_skia::Transform::identity(),
+            &mut pixels.as_mut(),
+        );
+        assert!(
+            pixels.pixels().iter().filter(|p| p.alpha() > 100).count() > 20,
+            "Horizontal icon must be visible"
+        );
+    }
+}

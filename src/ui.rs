@@ -54,6 +54,11 @@ enum CloseDecision {
     Cancel,
     WaitForSave(u64),
 }
+#[derive(Clone, Copy)]
+enum CloseIntent {
+    Tab(usize),
+    Exit,
+}
 #[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize)]
 enum Target {
     Block(usize),
@@ -235,6 +240,8 @@ pub struct App {
     page_transfer: Option<pages::PageTransfer>,
     page_selection: pages::PageSelection,
     scroll_offset: Vec2,
+    pan_margin: Vec2,
+    middle_panning: bool,
     documents: Vec<Option<documents::DocumentState>>,
     active_document: usize,
     fonts: typography::FontBook,
@@ -295,6 +302,8 @@ impl App {
             page_transfer: None,
             page_selection: Default::default(),
             scroll_offset: Vec2::ZERO,
+            pan_margin: Vec2::ZERO,
+            middle_panning: false,
             documents: Vec::new(),
             active_document: 0,
             fonts: typography::FontBook::start(),
@@ -419,15 +428,28 @@ impl App {
                 .is_some_and(|i| !i.committed && i.changed())
             && !self.comment_changed()
         {
+            self.work.discard_choice = None;
             return CloseDecision::Proceed;
         }
-        let choice = rfd::MessageDialog::new()
-            .set_title("Modifications non enregistrées")
-            .set_description("Enregistrer avant de continuer ?")
-            .set_buttons(rfd::MessageButtons::YesNoCancel)
-            .show();
-        self.resolve_discard_choice(choice)
+        if self
+            .editor
+            .as_ref()
+            .is_some_and(|e| self.work.discard_approved.contains(&e.instance))
+        {
+            return CloseDecision::Proceed;
+        }
+        if let Some(choice) = self.work.discard_choice.take() {
+            if choice == rfd::MessageDialogResult::No
+                && let Some(e) = &self.editor
+            {
+                self.work.discard_approved.insert(e.instance);
+            }
+            return self.resolve_discard_choice(choice);
+        }
+        self.work.discard_dialog = true;
+        CloseDecision::Cancel
     }
+
     fn resolve_discard_choice(&mut self, choice: rfd::MessageDialogResult) -> CloseDecision {
         match choice {
             rfd::MessageDialogResult::Yes => {
@@ -1014,7 +1036,11 @@ impl App {
         if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::F1)) {
             self.work.help_open = !self.work.help_open;
         }
-        if self.work.help_open || self.work.show_recovery || self.work.recovered_draft.is_some() {
+        if self.work.discard_dialog
+            || self.work.help_open
+            || self.work.show_recovery
+            || self.work.recovered_draft.is_some()
+        {
             return;
         }
         if self.printing.open || self.recognition.is_some() {

@@ -297,9 +297,11 @@ fn drag_pointer(ctx: &egui::Context, app: &mut App, start: Pos2, end: Pos2) {
 fn sheet_origin(app: &App) -> Pos2 {
     let p = &app.editor.as_ref().unwrap().info.pages[app.page];
     Pos2::new(
-        app.canvas.left() + ((app.canvas.width() - 18. - p.width * app.zoom) / 2.).max(0.)
+        app.canvas.left()
+            + app.pan_margin.x
+            + ((app.canvas.width() - 18. - p.width * app.zoom) / 2.).max(0.)
             - app.scroll_offset.x,
-        app.canvas.top() - app.scroll_offset.y
+        app.canvas.top() + app.pan_margin.y - app.scroll_offset.y
             + if app.editor.as_ref().unwrap().info.pages.len() == 1 {
                 ((app.canvas.height() - p.height * app.zoom) / 2.).max(0.)
             } else {
@@ -5168,7 +5170,7 @@ fn pdfnorris_welcome_identity_and_open_button_fit_small_and_large_windows() {
 
 #[test]
 fn middle_button_temporarily_pans_without_changing_tools_or_document() {
-    for tool in [
+    for (tool, zoom) in [
         Tool::Select,
         Tool::Hand,
         Tool::Move,
@@ -5178,10 +5180,13 @@ fn middle_button_temporarily_pans_without_changing_tools_or_document() {
         Tool::Draw,
         Tool::Highlight,
         Tool::Comment,
-    ] {
+    ]
+    .into_iter()
+    .flat_map(|tool| [0.5, 2.].map(|zoom| (tool, zoom)))
+    {
         let (ctx, mut app) = setup();
         app.fit = Fit::Manual;
-        app.zoom = 2.;
+        app.zoom = zoom;
         app.thumbnails = false;
         app.scroll_offset = Vec2::new(150., 200.);
         app.workspace = Workspace::Edit;
@@ -5225,12 +5230,12 @@ fn middle_button_temporarily_pans_without_changing_tools_or_document() {
             out.textures_delta.clear();
             if stage == 1 {
                 assert!(
-                    (app.scroll_offset.x - offset.x - 70.).abs() < 1.,
+                    (app.scroll_offset.x - app.pan_margin.x - offset.x - 70.).abs() < 1.,
                     "Horizontal pan: {:?}",
                     app.scroll_offset
                 );
                 assert!(
-                    (app.scroll_offset.y - offset.y - 95.).abs() < 1.,
+                    (app.scroll_offset.y - app.pan_margin.y - offset.y - 95.).abs() < 1.,
                     "Vertical pan: {:?}",
                     app.scroll_offset
                 );
@@ -5375,4 +5380,68 @@ fn drawn_table_cells_accept_independent_editable_text_and_survive_reopening() {
             .iter()
             .any(|i| i.drawing.kind == Kind::Table)
     );
+}
+
+#[test]
+fn closing_a_dirty_tab_uses_the_app_dialog_and_cancel_preserves_the_document() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    app.documents = vec![None];
+    app.editor.as_mut().unwrap().insert_blank_after(0).unwrap();
+    let bytes = app.editor.as_ref().unwrap().bytes.clone();
+    app.close_document(0);
+    assert!(app.work.discard_dialog && app.editor.is_some());
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![]);
+    }
+    click_named_control(&ctx, &mut app, "Annuler");
+    assert!(!app.work.discard_dialog);
+    assert_eq!(app.editor.as_ref().unwrap().bytes, bytes);
+    app.close_document(0);
+    input_frame(&ctx, &mut app, vec![]);
+    click_named_control(&ctx, &mut app, "Ne pas enregistrer");
+    assert!(app.editor.is_none() && app.documents.is_empty());
+}
+
+#[test]
+fn app_close_dialog_saves_before_finishing_exit() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    let dir = tempfile::tempdir_in("test-output").unwrap();
+    let path = dir.path().join("confirmed-save.pdf");
+    app.editor.as_mut().unwrap().path = Some(path.clone());
+    app.editor.as_mut().unwrap().insert_blank_after(0).unwrap();
+    app.documents = vec![None];
+    app.request_exit(&ctx);
+    assert!(app.work.discard_dialog && !app.close_confirmed);
+    input_frame(&ctx, &mut app, vec![]);
+    click_named_control(&ctx, &mut app, "Enregistrer");
+    for _ in 0..400 {
+        input_frame(&ctx, &mut app, vec![]);
+        if app.close_confirmed {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+    assert!(app.close_confirmed, "{:?}", app.message);
+    assert_eq!(Editor::open(&path).unwrap().info.pages.len(), 2);
+}
+
+#[test]
+fn app_close_dialog_prompts_each_dirty_tab_once() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    app.documents = vec![None];
+    app.editor.as_mut().unwrap().insert_blank_after(0).unwrap();
+    let bytes = app.editor.as_ref().unwrap().bytes.as_ref().clone();
+    app.insert_document(Editor::from_bytes(bytes).unwrap());
+    app.editor.as_mut().unwrap().insert_blank_after(0).unwrap();
+    app.request_exit(&ctx);
+    assert!(app.work.discard_dialog);
+    input_frame(&ctx, &mut app, vec![]);
+    click_named_control(&ctx, &mut app, "Ne pas enregistrer");
+    assert!(app.work.discard_dialog && !app.close_confirmed);
+    input_frame(&ctx, &mut app, vec![]);
+    click_named_control(&ctx, &mut app, "Ne pas enregistrer");
+    assert!(app.close_confirmed && !app.work.discard_dialog);
 }

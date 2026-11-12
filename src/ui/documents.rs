@@ -27,6 +27,7 @@ pub(super) struct DocumentState {
     page_destination: usize,
     page_selection: pages::PageSelection,
     scroll_offset: Vec2,
+    pan_margin: Vec2,
 }
 impl DocumentState {
     fn empty() -> Self {
@@ -57,6 +58,7 @@ impl DocumentState {
             page_destination: 1,
             page_selection: Default::default(),
             scroll_offset: Vec2::ZERO,
+            pan_margin: Vec2::ZERO,
         }
     }
     fn exchange(&mut self, app: &mut App) {
@@ -89,6 +91,8 @@ impl DocumentState {
         std::mem::swap(&mut self.page_destination, &mut app.page_destination);
         std::mem::swap(&mut self.page_selection, &mut app.page_selection);
         std::mem::swap(&mut self.scroll_offset, &mut app.scroll_offset);
+        std::mem::swap(&mut self.pan_margin, &mut app.pan_margin);
+        app.middle_panning = false;
     }
     fn take(app: &mut App) -> Self {
         let mut state = Self::empty();
@@ -283,7 +287,12 @@ impl App {
                 self.work.close_after_save = Some(id);
                 return;
             }
-            CloseDecision::Cancel => return,
+            CloseDecision::Cancel => {
+                if self.work.discard_dialog {
+                    self.work.close_intent = Some(CloseIntent::Tab(index));
+                }
+                return;
+            }
         }
         if let Some(e) = &self.editor {
             self.work.journal.remove(e.instance);
@@ -329,7 +338,9 @@ impl App {
                     if let CloseDecision::WaitForSave(id) = decision {
                         self.work.exit_after_save = Some(id);
                     }
-                    self.activate_unchecked(original);
+                    if !self.work.discard_dialog {
+                        self.activate_unchecked(original);
+                    }
                     return false;
                 }
             }
@@ -340,6 +351,9 @@ impl App {
     pub(super) fn request_exit(&mut self, ctx: &egui::Context) {
         self.work.exit_after_jobs = false;
         if !self.discard_all_ok() {
+            if self.work.discard_dialog {
+                self.work.close_intent = Some(CloseIntent::Exit);
+            }
             return;
         }
         if self.word_export.is_some() || self.printing.busy || self.work.saving.is_some() {

@@ -18,6 +18,10 @@ pub(super) struct SearchJob {
 pub(super) struct Work {
     pub panel_width: f32,
     pub help_open: bool,
+    pub discard_dialog: bool,
+    pub discard_choice: Option<rfd::MessageDialogResult>,
+    pub close_intent: Option<CloseIntent>,
+    pub discard_approved: std::collections::HashSet<u64>,
     pub opening: Option<Receiver<Result<Editor>>>,
     pub opening_path: Option<PathBuf>,
     pub paths: VecDeque<PathBuf>,
@@ -40,6 +44,10 @@ impl Default for Work {
         Self {
             panel_width: 0.,
             help_open: false,
+            discard_dialog: false,
+            discard_choice: None,
+            close_intent: None,
+            discard_approved: Default::default(),
             opening: None,
             opening_path: None,
             paths: VecDeque::new(),
@@ -367,6 +375,87 @@ impl App {
         }
         if self.work.journal.active() {
             ctx.request_repaint_after(Duration::from_secs(2));
+        }
+    }
+    pub(super) fn discard_dialog(&mut self, ctx: &egui::Context) {
+        if !self.work.discard_dialog {
+            return;
+        }
+        let mut choice = None;
+        let name = self
+            .editor
+            .as_ref()
+            .map(|e| e.display_name())
+            .unwrap_or_default();
+        egui::Modal::new(egui::Id::new("close-document-confirmation"))
+            .frame(
+                egui::Frame::window(&ctx.style_of(egui::Theme::Light))
+                    .fill(Color32::from_rgb(249, 251, 254))
+                    .corner_radius(14.)
+                    .inner_margin(22.),
+            )
+            .show(ctx, |ui| {
+                ui.set_width(410.);
+                ui.horizontal(|ui| {
+                    let r = ui
+                        .allocate_exact_size(Vec2::splat(30.), egui::Sense::hover())
+                        .0;
+                    icons::draw(ui.painter(), Icon::Brand, r, Color32::WHITE);
+                    ui.label(
+                        egui::RichText::new("Enregistrer les modifications ?")
+                            .size(19.)
+                            .strong(),
+                    );
+                });
+                ui.add_space(10.);
+                ui.label(egui::RichText::new(name).strong());
+                ui.label("Vos modifications ne sont pas encore enregistrées.");
+                ui.add_space(18.);
+                ui.horizontal_wrapped(|ui| {
+                    if ui
+                        .add(
+                            egui::Button::new(
+                                egui::RichText::new("Enregistrer").color(Color32::WHITE),
+                            )
+                            .fill(Color32::from_rgb(190, 76, 5))
+                            .min_size(Vec2::new(110., 34.)),
+                        )
+                        .clicked()
+                    {
+                        choice = Some(rfd::MessageDialogResult::Yes);
+                    }
+                    if ui
+                        .add(egui::Button::new("Ne pas enregistrer").min_size(Vec2::new(140., 34.)))
+                        .clicked()
+                    {
+                        choice = Some(rfd::MessageDialogResult::No);
+                    }
+                    if ui
+                        .add(egui::Button::new("Annuler").min_size(Vec2::new(85., 34.)))
+                        .clicked()
+                    {
+                        choice = Some(rfd::MessageDialogResult::Cancel);
+                    }
+                });
+                if ui.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)) {
+                    choice = Some(rfd::MessageDialogResult::Cancel);
+                }
+            });
+        if let Some(choice) = choice {
+            self.work.discard_dialog = false;
+            let intent = self.work.close_intent.take();
+            if choice == rfd::MessageDialogResult::Cancel {
+                self.work.discard_approved.clear();
+            } else {
+                self.work.discard_choice = Some(choice);
+                match intent {
+                    Some(CloseIntent::Tab(index)) => self.close_document(index),
+                    Some(CloseIntent::Exit) => self.request_exit(ctx),
+                    None => {
+                        self.work.discard_choice = None;
+                    }
+                }
+            }
         }
     }
     pub(super) fn recovery_dialog(&mut self, ctx: &egui::Context) {
