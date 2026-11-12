@@ -312,20 +312,14 @@ impl App {
         };
         #[cfg(not(test))]
         if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-            match pdfnorris::recovery::Journal::start(
+            // Keep checkpoints local without prompting or restoring at startup.
+            if let Ok(journal) = pdfnorris::recovery::Journal::start(
                 &PathBuf::from(local).join("Ergonatus/PDFinator/Recovery"),
             ) {
-                Ok(journal) => {
-                    app.work.show_recovery = !journal.entries.is_empty();
-                    app.work.journal = journal;
-                }
-                Err(e) => {
-                    app.message = Some(format!(
-                        "La récupération automatique est indisponible : {e}"
-                    ))
-                }
+                app.work.journal = journal;
             }
         }
+
         if let Some(p) = path {
             app.open(p);
         }

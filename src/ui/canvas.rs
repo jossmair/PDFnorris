@@ -35,11 +35,7 @@ impl App {
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
-                    .fill(if self.editor.is_none() {
-                        Color32::from_rgb(23, 28, 36)
-                    } else {
-                        Color32::from_rgb(227, 234, 244)
-                    })
+                    .fill(Color32::from_rgb(227, 234, 244))
                     .inner_margin(12.),
             )
             .show(root, |ui| {
@@ -48,18 +44,13 @@ impl App {
                 let Some(e) = &self.editor else {
                     ui.vertical_centered(|ui| {
                         ui.add_space(((ui.available_height() - 380.) / 2.).max(12.));
-                        let r = ui
-                            .allocate_exact_size(Vec2::splat(48.), egui::Sense::hover())
-                            .0;
-                        icons::draw(ui.painter(), Icon::Brand, r, Color32::WHITE);
-                        ui.add_space(16.);
                         let mut name = egui::text::LayoutJob::default();
                         name.append(
                             "PDF",
                             0.,
                             egui::TextFormat {
                                 font_id: egui::FontId::proportional(32.),
-                                color: Color32::WHITE,
+                                color: Color32::BLACK,
                                 ..Default::default()
                             },
                         );
@@ -78,26 +69,33 @@ impl App {
                             egui::RichText::new(format!("« {} »", pdfnorris::SLOGAN))
                                 .size(20.)
                                 .strong()
-                                .color(Color32::WHITE),
+                                .color(Color32::BLACK),
                         );
                         ui.add_space(8.);
                         ui.label(
                             egui::RichText::new("Un logiciel de la suite Ergonatus")
                                 .size(13.)
-                                .color(Color32::from_rgb(158, 169, 186)),
+                                .color(Color32::from_rgb(63, 80, 105)),
                         );
                         ui.add_space(8.);
                         ui.label(
                             egui::RichText::new(pdfnorris::DISPLAY_VERSION)
                                 .size(11.)
-                                .color(Color32::from_rgb(158, 169, 186)),
+                                .color(Color32::from_rgb(63, 80, 105)),
                         );
                         ui.add_space(20.);
+                        let r = ui
+                            .allocate_exact_size(Vec2::splat(48.), egui::Sense::hover())
+                            .0;
+                        icons::draw(ui.painter(), Icon::Open, r, Color32::WHITE);
+                        ui.add_space(16.);
+                        ui.heading("Ouvrir un document PDF");
+                        ui.add_space(8.);
                         ui.label(
                             egui::RichText::new(
-                                "Glissez un PDF dans cette fenêtre pour commencer.",
+                                "Glissez votre PDF dans cette fenêtre ou choisissez un fichier.",
                             )
-                            .color(Color32::from_rgb(200, 209, 220)),
+                            .color(Color32::from_rgb(42, 61, 89)),
                         );
                         ui.add_space(18.);
                         if icons::small(ui, Icon::Open, "Choisir un fichier…").clicked() {

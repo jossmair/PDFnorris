@@ -3,7 +3,8 @@
 - Nom public : **PDFnorris** (PDF blanc, norris orange).
 - Slogan : **Aucun PDF ne lui résiste.**
 - Signature : Un logiciel de la suite Ergonatus.
-- Couleurs : anthracite `#171c24`, blanc `#ffffff`, orange `#ff6c00`.
+- Accueil : fond clair `#e3eaf4`, PDF noir et norris orange `#ff6c00`.
+- Bandeau GitHub : anthracite `#171c24`, blanc `#ffffff`, orange `#ff6c00`.
 - Première version publique : **V1.00**, tag GitHub `v1.00`.
 - Version technique Cargo/Windows : `1.0.0`.
 

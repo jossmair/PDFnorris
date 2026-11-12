@@ -5100,6 +5100,12 @@ fn pdfnorris_welcome_identity_and_open_button_fit_small_and_large_windows() {
                 .or(n.value())
                 .is_some_and(|s| s.contains(pdfnorris::SLOGAN))
         }));
+        assert!(!app.work.show_recovery);
+        assert!(
+            !nodes
+                .iter()
+                .any(|(_, n)| n.label() == Some("Aide et raccourcis · F1"))
+        );
         let button = nodes
             .iter()
             .find(|(_, n)| n.label() == Some("Choisir un fichier…"))

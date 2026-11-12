@@ -74,23 +74,6 @@ impl App {
                         }
                     }
                     ui.add_space(8.);
-                    let help = ui
-                        .add(
-                            egui::Button::new(egui::RichText::new("?").color(Color32::WHITE))
-                                .frame(false)
-                                .min_size(Vec2::new(25., 28.)),
-                        )
-                        .on_hover_text("Aide et raccourcis · F1");
-                    help.widget_info(|| {
-                        egui::WidgetInfo::labeled(
-                            egui::WidgetType::Button,
-                            true,
-                            "Aide et raccourcis · F1",
-                        )
-                    });
-                    if help.clicked() {
-                        self.work.help_open = true;
-                    }
                     let mut activate = None;
                     let mut close = None;
                     let mut cards = Vec::new();
