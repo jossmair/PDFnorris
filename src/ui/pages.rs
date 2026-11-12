@@ -1,0 +1,956 @@
+//! Page overview and navigation. All mutations use the same transactional history as text.
+use super::*;
+
+pub(super) struct PageTransfer {
+    source: u64,
+    pages: Vec<usize>,
+    bytes: Vec<u8>,
+    name: String,
+    geometry: PageInfo,
+    preview: Option<egui::TextureHandle>,
+}
+
+#[derive(Default)]
+pub(super) struct PageSelection {
+    pages: std::collections::BTreeSet<usize>,
+    anchor: Option<usize>,
+}
+impl PageSelection {
+    pub(super) fn contains(&self, page: usize, active: usize) -> bool {
+        if self.pages.is_empty() {
+            page == active
+        } else {
+            self.pages.contains(&page)
+        }
+    }
+    fn selected(&self, active: usize, count: usize) -> Vec<usize> {
+        let pages: Vec<_> = self.pages.iter().copied().filter(|&p| p < count).collect();
+        if pages.is_empty() && active < count {
+            vec![active]
+        } else {
+            pages
+        }
+    }
+    pub(super) fn replace(&mut self, pages: impl IntoIterator<Item = usize>) {
+        self.pages = pages.into_iter().collect();
+        self.anchor = self.pages.first().copied();
+    }
+    fn click(&mut self, page: usize, active: usize, modifiers: Modifiers) {
+        if modifiers.shift {
+            let anchor = self.anchor.unwrap_or(active);
+            if !modifiers.ctrl && !modifiers.command {
+                self.pages.clear();
+            }
+            self.pages.extend(anchor.min(page)..=anchor.max(page));
+            self.anchor = Some(anchor);
+        } else if modifiers.ctrl || modifiers.command {
+            if self.pages.is_empty() {
+                self.pages.insert(active);
+            }
+            if !self.pages.remove(&page) {
+                self.pages.insert(page);
+            }
+            self.anchor = Some(page);
+        } else {
+            self.replace([page]);
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct PageDropTarget {
+    pub destination: usize,
+    slot: usize,
+    pub marker: [Pos2; 2],
+}
+impl PageDropTarget {
+    pub(super) fn closest(
+        source: usize,
+        pos: Pos2,
+        cards: &[(usize, Rect)],
+        vertical: bool,
+    ) -> Option<Self> {
+        let &(page, card) = cards.iter().min_by(|(_, a), (_, b)| {
+            a.distance_sq_to_pos(pos)
+                .total_cmp(&b.distance_sq_to_pos(pos))
+        })?;
+        let after = if vertical {
+            pos.y >= card.center().y
+        } else {
+            pos.x >= card.center().x
+        };
+        let slot = page + usize::from(after);
+        let marker = if vertical {
+            let y = if after {
+                card.bottom() + 5.
+            } else {
+                card.top() - 5.
+            };
+            [
+                Pos2::new(card.left() + 4., y),
+                Pos2::new(card.right() - 4., y),
+            ]
+        } else {
+            let x = if after {
+                card.right() + 7.
+            } else {
+                card.left() - 7.
+            };
+            [
+                Pos2::new(x, card.top() + 4.),
+                Pos2::new(x, card.bottom() - 4.),
+            ]
+        };
+        Some(Self {
+            destination: slot.saturating_sub(usize::from(source < slot)),
+            slot,
+            marker,
+        })
+    }
+}
+
+impl App {
+    pub(super) fn page_selection_shortcuts(&mut self, ctx: &egui::Context) {
+        let count = self.editor.as_ref().map_or(0, |e| e.info.pages.len());
+        if ctx.input_mut(|i| i.consume_key(Modifiers::CTRL, Key::A)) {
+            self.page_selection.replace(0..count);
+        }
+        if self.page_drag.is_none()
+            && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape))
+        {
+            self.page_selection.replace([self.page]);
+        }
+        if ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Delete)) {
+            self.apply_page_action(2);
+        }
+        let shift = Modifiers {
+            shift: true,
+            ..Modifiers::NONE
+        };
+        for (key, direction) in [(Key::ArrowLeft, -1_isize), (Key::ArrowRight, 1)] {
+            if ctx.input_mut(|i| i.consume_key(shift, key)) {
+                let page = self
+                    .page
+                    .saturating_add_signed(direction)
+                    .min(count.saturating_sub(1));
+                self.select_thumbnail(page, shift);
+                self.jump = Some(page);
+            }
+        }
+    }
+    pub(super) fn selected_pages(&self) -> Vec<usize> {
+        self.page_selection.selected(
+            self.page,
+            self.editor.as_ref().map_or(0, |e| e.info.pages.len()),
+        )
+    }
+    pub(super) fn select_thumbnail(&mut self, page: usize, modifiers: Modifiers) {
+        if self.deselect() {
+            self.page_selection.click(page, self.page, modifiers);
+            self.page = page;
+            self.page_destination = page + 1;
+        }
+    }
+    fn extract_selected_pages(&mut self) {
+        if !self.finish_text() {
+            return;
+        }
+        let pages = self.selected_pages();
+        let result = self
+            .editor
+            .as_ref()
+            .ok_or("Aucun document ouvert.".into())
+            .and_then(|e| e.extract_page_group(&pages))
+            .and_then(|bytes| Editor::from_generated_bytes(bytes, "Pages extraites.pdf".into()));
+        match result {
+            Ok(editor) => self.insert_document(editor),
+            Err(error) => self.message = Some(error),
+        }
+    }
+    fn apply_page_action(&mut self, action: usize) {
+        if action == 5 {
+            self.extract_selected_pages();
+            return;
+        }
+        if !self.finish_text() || !self.permit() {
+            return;
+        }
+        let pages = self.selected_pages();
+        let Some(e) = &mut self.editor else {
+            return;
+        };
+        let mut next = pages.clone();
+        let result = match action {
+            0 => e
+                .insert_blank_after(self.page)
+                .map(|page| next = vec![page]),
+            1 => e
+                .duplicate_page_group(&pages)
+                .map(|range| next = range.collect()),
+            2 => e
+                .delete_page_group(&pages)
+                .map(|_| next = vec![self.page.min(e.info.pages.len() - 1)]),
+            3 => e.rotate_page_group(&pages, -90),
+            _ => e.rotate_page_group(&pages, 90),
+        };
+        match result {
+            Ok(()) => {
+                self.page = next[0];
+                self.page_destination = self.page + 1;
+                self.reset_page_views(true);
+                self.page_selection.replace(next);
+                self.jump = Some(self.page);
+            }
+            Err(error) => self.message = Some(error),
+        }
+    }
+    pub(super) fn page_context_menu(&mut self, response: &egui::Response, page: usize) {
+        if response.secondary_clicked() && !self.page_selection.contains(page, self.page) {
+            self.select_thumbnail(page, Modifiers::NONE);
+        }
+        if response.secondary_clicked() {
+            self.page = page;
+        }
+        response.context_menu(|ui| {
+            let count = self.editor.as_ref().map_or(0, |e| e.info.pages.len());
+            let selected = self.selected_pages().len();
+            if selected > 1 {
+                ui.label(format!("{selected} pages sélectionnées"));
+                ui.separator();
+            }
+            let mut action = None;
+            for (id, label) in [
+                "Ajouter une page blanche",
+                "Dupliquer",
+                "Supprimer",
+                "Tourner à gauche",
+                "Tourner à droite",
+                "Extraire vers un nouveau PDF",
+            ]
+            .iter()
+            .enumerate()
+            {
+                if ui
+                    .add_enabled(
+                        (id != 2 || count > selected)
+                            && (id != 5 || self.editor.as_ref().is_some_and(Editor::can_copy)),
+                        egui::Button::new(*label),
+                    )
+                    .clicked()
+                {
+                    action = Some(id);
+                    ui.close();
+                }
+            }
+            if self.documents.len() > 1 {
+                let mut copy_to = None;
+                ui.add_enabled_ui(self.editor.as_ref().is_some_and(Editor::can_copy), |ui| {
+                    ui.menu_button("Copier vers un autre PDF", |ui| {
+                        for index in 0..self.documents.len() {
+                            if index != self.active_document
+                                && ui
+                                    .button(format!("Copier dans {}", self.document_label(index)))
+                                    .clicked()
+                            {
+                                copy_to = Some(index);
+                                ui.close();
+                            }
+                        }
+                    });
+                });
+                if let Some(index) = copy_to {
+                    self.copy_pages_to_document(index);
+                    ui.close();
+                    return;
+                }
+            }
+            ui.separator();
+            let mut destination = page + 1;
+            let key = egui::Id::new(("page-menu-position", page));
+            destination = ui.ctx().data_mut(|d| *d.get_temp_mut_or(key, destination));
+            ui.horizontal(|ui| {
+                ui.label("Déplacer à la page");
+                ui.add(
+                    egui::DragValue::new(&mut destination)
+                        .range(1..=count.saturating_sub(selected).saturating_add(1).max(1)),
+                );
+            });
+            ui.ctx().data_mut(|d| d.insert_temp(key, destination));
+            if ui.button("Déplacer").clicked() {
+                self.move_current_page(destination.saturating_sub(1));
+                ui.close();
+            }
+            if let Some(action) = action {
+                self.apply_page_action(action);
+            }
+        });
+    }
+    pub(super) fn foreign_page_drag(&self) -> bool {
+        self.page_transfer
+            .as_ref()
+            .is_some_and(|t| self.editor.as_ref().is_none_or(|e| e.instance != t.source))
+    }
+    pub(super) fn cancel_page_drag(&mut self) {
+        self.page_drag = None;
+        self.page_tab_hover = None;
+        self.page_drop_document = None;
+        if let Some(transfer) = self.page_transfer.take() {
+            let source = if self
+                .editor
+                .as_ref()
+                .is_some_and(|e| e.instance == transfer.source)
+            {
+                Some(self.active_document)
+            } else {
+                self.documents
+                    .iter()
+                    .enumerate()
+                    .find_map(|(index, state)| {
+                        state
+                            .as_ref()
+                            .and_then(|state| state.editor())
+                            .filter(|e| e.instance == transfer.source)
+                            .map(|_| index)
+                    })
+            };
+            if let Some(source) = source {
+                self.activate_unchecked(source);
+            }
+        }
+    }
+    pub(super) fn hover_page_tab(&mut self, index: usize) {
+        if self.page_transfer.is_none() {
+            let pages = self.selected_pages();
+            let Some(editor) = self.editor.as_ref() else {
+                return;
+            };
+            let Some(&page) = pages.first() else { return };
+            match editor.extract_page_group(&pages) {
+                Ok(bytes) => {
+                    self.page_transfer = Some(PageTransfer {
+                        source: editor.instance,
+                        pages,
+                        bytes,
+                        name: editor.display_name(),
+                        geometry: editor.info.pages[page].clone(),
+                        preview: self.raster.thumbs.get(&page).cloned(),
+                    })
+                }
+                Err(error) => {
+                    self.cancel_page_drag();
+                    self.message = Some(error);
+                    return;
+                }
+            }
+        }
+        self.activate_unchecked(index);
+        self.thumbnails = true;
+    }
+    pub(super) fn drop_transferred_pages(&mut self, at: usize) -> bool {
+        self.page_drag = None;
+        self.page_tab_hover = None;
+        self.page_drop_document = None;
+        if !self.deselect() || !self.permit() {
+            self.page_transfer = None;
+            return false;
+        }
+        let Some(transfer) = self.page_transfer.take() else {
+            return false;
+        };
+        let result = self
+            .editor
+            .as_mut()
+            .ok_or_else(|| "Aucun PDF ouvert.".to_owned())
+            .and_then(|editor| editor.insert_pdf_at(&transfer.name, transfer.bytes, at));
+        match result {
+            Ok(pages) => {
+                self.page = pages.start;
+                self.page_destination = self.page + 1;
+                self.reset_page_views(true);
+                self.page_selection.replace(pages);
+                self.jump = Some(self.page);
+                self.message = None;
+                true
+            }
+            Err(error) => {
+                self.message = Some(error);
+                false
+            }
+        }
+    }
+    pub(super) fn page_drag_input(&mut self, ctx: &egui::Context) {
+        let released = ctx.input(|i| i.pointer.button_released(egui::PointerButton::Primary));
+        if (self.page_drag.is_some()
+            && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape)))
+            || (!released && !ctx.input(|i| i.pointer.primary_down()))
+        {
+            self.cancel_page_drag();
+        }
+    }
+    pub(super) fn begin_page_drag(&mut self, page: usize) {
+        self.page_transfer = None;
+        self.page_tab_hover = None;
+        if self.deselect() {
+            if !self.page_selection.contains(page, self.page) {
+                self.page_selection.replace([page]);
+            }
+            self.page = page;
+            self.page_destination = page + 1;
+            self.page_drag = Some(page);
+        }
+    }
+    fn reset_page_views(&mut self, reset_raster: bool) {
+        self.page_selection.replace([self.page]);
+        self.selected = None;
+        self.inline = None;
+        self.drag = None;
+        self.objects.clear();
+        self.blocks.clear();
+        self.text.clear();
+        self.hits.clear();
+        self.text_selection = None;
+        self.drawing.selected.clear();
+        self.marquee.clear();
+        self.drawing.drag = None;
+        if let Some(e) = &self.editor {
+            self.page = self.page.min(e.info.pages.len().saturating_sub(1));
+            self.raster.document(e.bytes.clone(), reset_raster, None);
+        }
+    }
+    pub(super) fn insert_blank_page(&mut self) {
+        if self.workspace != Workspace::Edit || !self.deselect() || !self.permit() {
+            return;
+        }
+        let Some(editor) = &mut self.editor else {
+            return;
+        };
+        match editor.insert_blank_after(self.page) {
+            Ok(page) => {
+                self.page = page;
+                self.page_destination = page + 1;
+                self.reset_page_views(true);
+                self.jump = Some(page);
+                self.message = None;
+            }
+            Err(error) => self.message = Some(error),
+        }
+    }
+    fn rotate_current_page(&mut self, degrees: i64) {
+        if !self.finish_text() || !self.permit() {
+            return;
+        }
+        let pages = self.selected_pages();
+        if let Some(e) = &mut self.editor {
+            match e.rotate_page_group(&pages, degrees) {
+                Ok(()) => {
+                    self.reset_page_views(true);
+                    self.page_selection.replace(pages);
+                }
+                Err(error) => self.message = Some(error),
+            }
+        }
+    }
+    pub(super) fn move_current_page(&mut self, destination: usize) {
+        if !self.finish_text() || !self.permit() {
+            return;
+        }
+        let pages = self.selected_pages();
+        let count = pages.len();
+        let destination = destination.min(
+            self.editor
+                .as_ref()
+                .map_or(0, |e| e.info.pages.len().saturating_sub(count)),
+        );
+        if let Some(e) = &mut self.editor {
+            match e.move_page_group(&pages, destination) {
+                Ok(()) => {
+                    self.page = destination;
+                    self.page_destination = destination + 1;
+                    self.reset_page_views(true);
+                    self.page_selection
+                        .replace(destination..destination + count);
+                }
+                Err(error) => self.message = Some(error),
+            }
+        }
+    }
+    pub(super) fn open_page(&mut self, page: usize) {
+        if !self.finish_text() {
+            return;
+        }
+        self.page = page;
+        self.workspace = Workspace::Read;
+        self.tool = Tool::Select;
+        self.selected = None;
+        self.jump = Some(page);
+    }
+    pub(super) fn page_controls(&mut self, ui: &mut egui::Ui, cell: f32) {
+        let count = self.editor.as_ref().map_or(0, |e| e.info.pages.len());
+        let action = |ui: &mut egui::Ui, icon, label: &str, enabled| {
+            icons::button(ui, icon, label, false, enabled, cell)
+                .on_hover_text(label)
+                .clicked()
+        };
+        if action(
+            ui,
+            Icon::AddPdf,
+            "Ajouter des PDF à la fin · Ctrl+Maj+O",
+            count > 0,
+        ) {
+            self.pick_append_pdfs();
+        }
+        ui.horizontal(|ui| {
+            if action(ui, Icon::RotateLeft, "Tourner à gauche · 90°", count > 0) {
+                self.rotate_current_page(-90);
+            }
+            if action(ui, Icon::RotateRight, "Tourner à droite · 90°", count > 0) {
+                self.rotate_current_page(90);
+            }
+        });
+        ui.vertical_centered(|ui| {
+            ui.label(
+                egui::RichText::new(format!("{} / {count}", self.page + 1))
+                    .color(Color32::WHITE)
+                    .strong()
+                    .size(12.),
+            );
+        });
+        ui.horizontal(|ui| {
+            if action(ui, Icon::Previous, "Avancer cette page", self.page > 0) {
+                self.move_current_page(self.page.saturating_sub(1));
+            }
+            if action(ui, Icon::Next, "Reculer cette page", self.page + 1 < count) {
+                self.move_current_page((self.page + 1).min(count.saturating_sub(1)));
+            }
+        });
+        ui.separator();
+        ui.label(egui::RichText::new("Position").size(11.));
+        ui.horizontal(|ui| {
+            ui.scope(|ui| {
+                ui.spacing_mut().interact_size.x = cell;
+                ui.visuals_mut().override_text_color = Some(Color32::WHITE);
+                ui.visuals_mut().widgets.inactive.weak_bg_fill = Color32::from_rgb(40, 62, 99);
+                ui.visuals_mut().widgets.inactive.fg_stroke = Stroke::new(1., Color32::WHITE);
+                let field = ui.add(
+                    egui::DragValue::new(&mut self.page_destination)
+                        .range(1..=count.max(1))
+                        .min_decimals(0)
+                        .max_decimals(0),
+                );
+                field.widget_info(|| {
+                    egui::WidgetInfo::labeled(
+                        egui::WidgetType::DragValue,
+                        count > 0,
+                        "Nouvelle position de la page",
+                    )
+                });
+                field.on_hover_text("Nouvelle position de la page");
+            });
+            if action(ui, Icon::Apply, "Appliquer cette position", count > 0) {
+                self.move_current_page(self.page_destination.saturating_sub(1));
+            }
+        });
+    }
+    /// Copy, rather than remove, pages when dropping on another document tab.
+    pub(super) fn copy_pages_to_document(&mut self, destination: usize) {
+        if destination == self.active_document || destination >= self.documents.len() {
+            return;
+        }
+        if !self.deselect() {
+            return;
+        }
+        let source = self.active_document;
+        let selected = self.selected_pages();
+        let extracted = self
+            .editor
+            .as_ref()
+            .ok_or_else(|| "Aucun document ouvert.".to_owned())
+            .and_then(|editor| editor.extract_page_group(&selected));
+        let bytes = match extracted {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                self.message = Some(error);
+                return;
+            }
+        };
+        let name = self.document_label(source);
+        self.page_drag = None;
+        if !self.activate_document(destination) || !self.deselect() || !self.permit() {
+            return;
+        }
+        let first = self.editor.as_ref().map_or(0, |e| e.info.pages.len());
+        let result = self
+            .editor
+            .as_mut()
+            .ok_or_else(|| "Aucun document ouvert.".to_owned())
+            .and_then(|editor| editor.append_pdfs(&[(&name, bytes)]));
+        match result {
+            Ok(added) => {
+                self.page = first;
+                self.page_destination = first + 1;
+                self.reset_page_views(true);
+                self.page_selection.replace(first..first + added);
+                self.thumbnails = true;
+                self.jump = Some(first);
+                self.message = None;
+            }
+            Err(error) => self.message = Some(error),
+        }
+    }
+    pub(super) fn pick_append_pdfs(&mut self) {
+        if self.workspace != Workspace::Pages || !self.finish_text() || !self.permit() {
+            return;
+        }
+        if let Some(paths) = rfd::FileDialog::new()
+            .set_title("Ajouter un ou plusieurs PDF à la fin")
+            .add_filter("Documents PDF", &["pdf"])
+            .pick_files()
+        {
+            self.append_pdf_paths(&paths);
+        }
+    }
+    pub(super) fn append_pdf_paths(&mut self, paths: &[PathBuf]) {
+        if self.workspace != Workspace::Pages || !self.finish_text() || !self.permit() {
+            return;
+        }
+        let loaded: Result<Vec<_>> = paths
+            .iter()
+            .map(|path| {
+                pdfnorris::files::read(path).map(|bytes| {
+                    (
+                        path.file_name()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .into_owned(),
+                        bytes,
+                    )
+                })
+            })
+            .collect();
+        let result = loaded.and_then(|loaded| {
+            let sources: Vec<_> = loaded
+                .iter()
+                .map(|(name, bytes)| (name.as_str(), bytes.clone()))
+                .collect();
+            self.editor
+                .as_mut()
+                .ok_or("Aucun document ouvert.")?
+                .append_pdfs(&sources)
+        });
+        match result {
+            Ok(added) if added > 0 => {
+                self.page = self.editor.as_ref().unwrap().info.pages.len() - added;
+                self.page_destination = self.page + 1;
+                self.reset_page_views(true);
+                self.jump = Some(self.page);
+                self.message = None;
+            }
+            Ok(_) => {}
+            Err(error) => self.message = Some(error),
+        }
+    }
+    pub(super) fn pages_canvas(&mut self, root: &mut egui::Ui) {
+        let ctx = root.ctx().clone();
+        let pages = self
+            .editor
+            .as_ref()
+            .map(|e| e.info.pages.clone())
+            .unwrap_or_default();
+        egui::CentralPanel::default()
+            .frame(
+                egui::Frame::new()
+                    .fill(Color32::from_rgb(230, 235, 243))
+                    .inner_margin(26.),
+            )
+            .show(root, |ui| {
+                self.canvas = ui.max_rect();
+                ui.spacing_mut().item_spacing = Vec2::splat(20.);
+                let columns = ((ui.available_width() + 20.) / 206.).floor().max(1.) as usize;
+                let card_width = ((ui.available_width() - 20. * (columns - 1) as f32)
+                    / columns as f32)
+                    .min(250.);
+                let card_height = card_width * 1.23 + 40.;
+                let mut cards = Vec::new();
+                let mut read = None;
+                let mut scroll =
+                    egui::ScrollArea::vertical().id_salt(("pages-overview", self.active_document));
+                if let Some(page) = self.jump.take() {
+                    self.page = page.min(pages.len().saturating_sub(1));
+                    self.page_destination = self.page + 1;
+                    scroll = scroll
+                        .vertical_scroll_offset((self.page / columns) as f32 * (card_height + 20.));
+                }
+                let overview = scroll.show_rows(
+                    ui,
+                    card_height,
+                    pages.len().div_ceil(columns),
+                    |ui, rows| {
+                        for row in rows {
+                            ui.horizontal(|ui| {
+                                for (page, p) in pages
+                                    .iter()
+                                    .enumerate()
+                                    .take((row + 1) * columns)
+                                    .skip(row * columns)
+                                {
+                                    let (card, response) = ui.allocate_exact_size(
+                                        Vec2::new(card_width, card_height),
+                                        egui::Sense::click_and_drag(),
+                                    );
+                                    response.widget_info(|| {
+                                        egui::WidgetInfo::selected(
+                                            egui::WidgetType::Button,
+                                            true,
+                                            self.page_selection.contains(page, self.page),
+                                            format!("Page {} · double-cliquer pour lire", page + 1),
+                                        )
+                                    });
+                                    let mut painter = ui.painter().clone();
+                                    if self.page_drag.is_some()
+                                        && self.page_selection.contains(page, self.page)
+                                    {
+                                        painter.multiply_opacity(0.35);
+                                    }
+                                    self.paint_page_card(
+                                        &painter,
+                                        card,
+                                        p,
+                                        page,
+                                        self.page_selection.contains(page, self.page),
+                                        &(page + 1).to_string(),
+                                    );
+                                    self.thumbnail_visible.push(page);
+                                    if response.clicked() {
+                                        self.select_thumbnail(page, ui.input(|i| i.modifiers));
+                                    }
+                                    self.page_context_menu(&response, page);
+                                    if response.double_clicked() {
+                                        read = Some(page);
+                                    }
+                                    if response.drag_started() {
+                                        self.begin_page_drag(page);
+                                    }
+                                    if card.intersects(ui.clip_rect()) {
+                                        cards.push((page, card));
+                                    }
+                                }
+                            });
+                        }
+                    },
+                );
+                let target = self
+                    .page_drag
+                    .zip(ctx.pointer_interact_pos())
+                    .and_then(|(source, pos)| PageDropTarget::closest(source, pos, &cards, false));
+                self.page_drag_feedback(ui, &overview, target, &pages, self.canvas);
+                if let Some(page) = read {
+                    self.open_page(page);
+                }
+            });
+        self.raster.queue(&[], &self.thumbnail_visible, 1., &ctx);
+    }
+    pub(super) fn page_drag_feedback(
+        &mut self,
+        ui: &egui::Ui,
+        overview: &egui::scroll_area::ScrollAreaOutput<()>,
+        target: Option<PageDropTarget>,
+        pages: &[PageInfo],
+        preview_bounds: Rect,
+    ) -> bool {
+        let Some(source) = self.page_drag else {
+            return false;
+        };
+        let ctx = ui.ctx();
+        let released = ctx.input(|i| i.pointer.button_released(egui::PointerButton::Primary));
+        let pos = ctx.pointer_interact_pos();
+        let inside = pos.is_some_and(|pos| overview.inner_rect.contains(pos));
+        let foreign = self.foreign_page_drag();
+        let selected = self
+            .page_transfer
+            .as_ref()
+            .map_or_else(|| self.selected_pages(), |t| t.pages.clone());
+        let target = target.filter(|_| inside).map(|mut t| {
+            t.destination = if foreign {
+                t.slot
+            } else {
+                t.slot
+                    .saturating_sub(selected.iter().filter(|&&p| p < t.slot).count())
+            };
+            t
+        });
+        if let Some(target) = target {
+            let painter = ui.painter().with_clip_rect(overview.inner_rect);
+            painter.line_segment(target.marker, Stroke::new(4., icons::BLUE));
+            for p in target.marker {
+                painter.circle_filled(p, 4., icons::BLUE);
+            }
+        }
+        if released {
+            self.page_drag = None;
+            if let Some(target) = target {
+                let before = self.editor.as_ref().map(Editor::revision);
+                if foreign {
+                    return self.drop_transferred_pages(target.destination);
+                }
+                self.page_transfer = None;
+                self.page = source;
+                self.move_current_page(target.destination);
+                return before != self.editor.as_ref().map(Editor::revision);
+            }
+            self.cancel_page_drag();
+        } else if let Some(pos) = pos {
+            ctx.set_cursor_icon(
+                if self.page_drop_document.is_some() || (foreign && inside) {
+                    egui::CursorIcon::Copy
+                } else if inside {
+                    egui::CursorIcon::Grabbing
+                } else {
+                    egui::CursorIcon::NoDrop
+                },
+            );
+            let size = Vec2::new(146., 190.);
+            let origin = (pos + Vec2::new(18., 18.))
+                .min(preview_bounds.max - size - Vec2::splat(4.))
+                .max(preview_bounds.min + Vec2::splat(4.));
+            let ghost = Rect::from_min_size(origin, size);
+            let painter = ctx
+                .layer_painter(egui::LayerId::new(
+                    egui::Order::Foreground,
+                    egui::Id::new("page-drag-preview"),
+                ))
+                .with_clip_rect(preview_bounds);
+            painter.rect_filled(
+                ghost.translate(Vec2::new(3., 6.)).expand(3.),
+                16.,
+                Color32::from_black_alpha(26),
+            );
+            let label = target.map_or_else(
+                || {
+                    self.page_drop_document.map_or_else(
+                        || format!("{} page(s)", selected.len()),
+                        |_| format!("Copier {} page(s)", selected.len()),
+                    )
+                },
+                |t| {
+                    if selected.len() > 1 {
+                        format!("{} pages → {}", selected.len(), t.destination + 1)
+                    } else {
+                        format!("{} → {}", source + 1, t.destination + 1)
+                    }
+                },
+            );
+            if let Some(transfer) = self.page_transfer.as_ref().filter(|_| foreign) {
+                self.paint_page_card(
+                    &painter,
+                    ghost,
+                    &transfer.geometry,
+                    usize::MAX,
+                    true,
+                    &label,
+                );
+                if let Some(texture) = &transfer.preview {
+                    let area = ghost.shrink2(Vec2::new(18., 20.));
+                    let scale = (area.width() / transfer.geometry.width)
+                        .min((area.height() - 20.) / transfer.geometry.height);
+                    let sheet = Rect::from_center_size(
+                        Pos2::new(area.center().x, area.top() + (area.height() - 20.) / 2.),
+                        Vec2::new(
+                            transfer.geometry.width * scale,
+                            transfer.geometry.height * scale,
+                        ),
+                    );
+                    painter.image(
+                        texture.id(),
+                        sheet,
+                        Rect::from_min_max(Pos2::ZERO, Pos2::new(1., 1.)),
+                        Color32::WHITE,
+                    );
+                }
+            } else if let Some(p) = pages.get(source) {
+                self.paint_page_card(&painter, ghost, p, source, true, &label);
+            }
+            if inside {
+                let edge = 48.;
+                let velocity = if pos.y < overview.inner_rect.top() + edge {
+                    -((overview.inner_rect.top() + edge - pos.y) / edge).clamp(0., 1.)
+                } else {
+                    ((pos.y - overview.inner_rect.bottom() + edge) / edge).clamp(0., 1.)
+                };
+                let max = (overview.content_size.y - overview.inner_rect.height()).max(0.);
+                let mut state = overview.state;
+                state.offset.y = (state.offset.y
+                    + velocity * 620. * ctx.input(|i| i.stable_dt.min(0.05)))
+                .clamp(0., max);
+                state.store(ctx, overview.id);
+                if velocity != 0. {
+                    ctx.request_repaint();
+                }
+            }
+        }
+        false
+    }
+    fn paint_page_card(
+        &self,
+        painter: &egui::Painter,
+        card: Rect,
+        page: &PageInfo,
+        index: usize,
+        selected: bool,
+        label: &str,
+    ) {
+        painter.rect_filled(
+            card.translate(Vec2::new(0., 3.)),
+            14.,
+            Color32::from_black_alpha(9),
+        );
+        painter.rect_filled(
+            card,
+            14.,
+            if selected {
+                Color32::from_rgb(219, 232, 255)
+            } else {
+                Color32::from_rgb(247, 249, 253)
+            },
+        );
+        painter.rect_stroke(
+            card,
+            14.,
+            Stroke::new(
+                if selected { 2. } else { 1. },
+                if selected {
+                    icons::BLUE
+                } else {
+                    Color32::from_rgb(214, 222, 235)
+                },
+            ),
+            StrokeKind::Inside,
+        );
+        let area = card.shrink2(Vec2::new(18., 20.));
+        let scale = (area.width() / page.width).min((area.height() - 20.) / page.height);
+        let sheet = Rect::from_center_size(
+            Pos2::new(area.center().x, area.top() + (area.height() - 20.) / 2.),
+            Vec2::new(page.width * scale, page.height * scale),
+        );
+        painter.rect_filled(
+            sheet.translate(Vec2::new(0., 2.)),
+            1.,
+            Color32::from_black_alpha(22),
+        );
+        painter.rect_filled(sheet, 1., Color32::WHITE);
+        if let Some(t) = self.raster.thumbs.get(&index) {
+            painter.image(
+                t.id(),
+                sheet,
+                Rect::from_min_max(Pos2::ZERO, Pos2::new(1., 1.)),
+                Color32::WHITE,
+            );
+        }
+        painter.text(
+            Pos2::new(card.center().x, card.bottom() - 16.),
+            egui::Align2::CENTER_CENTER,
+            label,
+            egui::FontId::proportional(12.),
+            if selected { icons::BLUE } else { icons::INK },
+        );
+    }
+}
