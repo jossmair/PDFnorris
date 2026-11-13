@@ -887,6 +887,9 @@ impl App {
     }
 }
 impl eframe::App for App {
+    fn raw_input_hook(&mut self, _ctx: &egui::Context, input: &mut egui::RawInput) {
+        self.middle_input.feed(input);
+    }
     fn ui(&mut self, root: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.frame_ui(root);
     }

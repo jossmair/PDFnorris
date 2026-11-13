@@ -5,7 +5,7 @@
 [Setup]
 AppId={{C37B4976-A267-4A3F-A19B-7BD916526746}
 AppName=PDFnorris
-AppVerName=PDFnorris V1.00
+AppVerName=PDFnorris V1.01
 AppVersion={#AppVersion}
 AppPublisher=Ergonatus
 AppCopyright=Ergonatus

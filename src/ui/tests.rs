@@ -5445,3 +5445,55 @@ fn app_close_dialog_prompts_each_dirty_tab_once() {
     click_named_control(&ctx, &mut app, "Ne pas enregistrer");
     assert!(app.close_confirmed && !app.work.discard_dialog);
 }
+
+#[test]
+fn native_middle_hook_moves_a_fitting_page_without_delivering_clicks_to_widgets() {
+    let (ctx, mut app) = setup();
+    app.workspace = Workspace::Edit;
+    app.tool = Tool::Edit;
+    app.fit = Fit::Manual;
+    app.zoom = 0.5;
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![]);
+    }
+    let start = app.canvas.center();
+    let before = app.editor.as_ref().unwrap().bytes.clone();
+    let mut press = egui::RawInput {
+        events: vec![
+            egui::Event::PointerMoved(start),
+            pointer_button(start, egui::PointerButton::Middle, true),
+        ],
+        ..Default::default()
+    };
+    eframe::App::raw_input_hook(&mut app, &ctx, &mut press);
+    assert!(!press.events.iter().any(|e| matches!(
+        e,
+        egui::Event::PointerButton {
+            button: egui::PointerButton::Middle,
+            ..
+        }
+    )));
+    input_frame(&ctx, &mut app, press.events);
+    let origin = sheet_origin(&app);
+    let end = start + Vec2::new(72., 55.);
+    let mut movement = egui::RawInput {
+        events: vec![egui::Event::PointerMoved(end)],
+        ..Default::default()
+    };
+    eframe::App::raw_input_hook(&mut app, &ctx, &mut movement);
+    let output = input_frame(&ctx, &mut app, movement.events);
+    assert_eq!(
+        output.platform_output.cursor_icon,
+        egui::CursorIcon::Grabbing
+    );
+    assert!((sheet_origin(&app) - origin - Vec2::new(72., 55.)).length() < 1.);
+    let mut release = egui::RawInput {
+        events: vec![pointer_button(end, egui::PointerButton::Middle, false)],
+        ..Default::default()
+    };
+    eframe::App::raw_input_hook(&mut app, &ctx, &mut release);
+    input_frame(&ctx, &mut app, release.events);
+    assert!(!app.middle_panning && !app.middle_input.down);
+    assert_eq!(app.editor.as_ref().unwrap().bytes, before);
+    assert!(app.tool == Tool::Edit);
+}

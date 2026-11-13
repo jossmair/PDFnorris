@@ -13,6 +13,7 @@ mod export;
 mod inline;
 mod layout;
 mod marquee;
+mod middle;
 mod pages;
 mod printing;
 mod raster;
@@ -242,6 +243,7 @@ pub struct App {
     scroll_offset: Vec2,
     pan_margin: Vec2,
     middle_panning: bool,
+    middle_input: middle::Input,
     documents: Vec<Option<documents::DocumentState>>,
     active_document: usize,
     fonts: typography::FontBook,
@@ -304,6 +306,7 @@ impl App {
             scroll_offset: Vec2::ZERO,
             pan_margin: Vec2::ZERO,
             middle_panning: false,
+            middle_input: Default::default(),
             documents: Vec::new(),
             active_document: 0,
             fonts: typography::FontBook::start(),

@@ -149,17 +149,28 @@ impl App {
                         ctx.input_mut(|i| i.smooth_scroll_delta = Vec2::ZERO);
                     }
                 }
-                let (middle_down, middle_pressed, pos) = ctx.input(|i| {
+                let (egui_down, pointer) = ctx.input(|i| {
                     (
                         i.pointer.button_down(egui::PointerButton::Middle),
-                        i.pointer.button_pressed(egui::PointerButton::Middle),
-                        i.pointer.interact_pos(),
+                        i.pointer.hover_pos().or(i.pointer.interact_pos()),
                     )
                 });
+                let middle_down = self.middle_input.down || egui_down;
+                let pos = if self.middle_input.down {
+                    self.middle_input.position
+                } else {
+                    pointer
+                };
+                let middle_delta = if self.middle_input.down {
+                    std::mem::take(&mut self.middle_input.delta)
+                } else {
+                    ctx.input(|i| i.pointer.delta())
+                };
                 if !middle_down {
                     self.middle_panning = false;
                 }
-                if middle_pressed
+                if middle_down
+                    && !self.middle_panning
                     && !self.printing.open
                     && !self.work.discard_dialog
                     && self.recognition.is_none()
@@ -179,8 +190,7 @@ impl App {
                     0.
                 };
                 if middle_pan {
-                    self.scroll_offset =
-                        (self.scroll_offset - ctx.input(|i| i.pointer.delta())).max(Vec2::ZERO);
+                    self.scroll_offset = (self.scroll_offset - middle_delta).max(Vec2::ZERO);
                 }
                 let viewport_height = ui.available_height();
                 let document_height: f32 = pages

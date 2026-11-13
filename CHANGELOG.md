@@ -22,3 +22,8 @@ Les marqueurs internes des anciens documents et les brouillons de récupération
 - Correctif du déplacement au bouton central pour les pages entièrement visibles, sans quitter l’outil courant.
 - Correctif du rendu des traits horizontaux (réduction de fenêtre et zoom moins).
 - Confirmation de fermeture intégrée au thème de l’application, avec sauvegarde, abandon explicite ou annulation.
+
+## V1.01
+
+- Le bouton central est capturé à l’entrée native des événements, avant les contrôles de l’interface. Le maintien du bouton déplace la vue sans modifier le document ni changer l’outil.
+- Les fichiers de distribution et les informations Windows portent la version technique 1.0.1.
