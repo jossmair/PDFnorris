@@ -12,15 +12,15 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.00/PDFnorris-1.0.0-Setup.exe"><img src="assets/telecharger-installateur.svg" alt="Télécharger l’installeur Windows — EXE" width="310"></a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-Setup.exe"><img src="assets/telecharger-installateur.svg" alt="Télécharger l’installeur Windows — EXE" width="310"></a>
   &nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.00/PDFnorris-1.0.0-portable-exe-windows-x64.zip"><img src="assets/telecharger-portable.svg" alt="Télécharger la version portable — ZIP" width="310"></a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-portable-exe-windows-x64.zip"><img src="assets/telecharger-portable.svg" alt="Télécharger la version portable — ZIP" width="310"></a>
 </p>
 
 <p align="center">
-  Version <strong>V1.00</strong> &nbsp;·&nbsp;
+  Version <strong>V1.01</strong> &nbsp;·&nbsp;
   <a href="https://github.com/jossmair/PDFnorris/releases/latest">Tous les téléchargements</a> &nbsp;·&nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.00/SHA256SUMS.txt">Vérifier les fichiers</a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/SHA256SUMS.txt">Vérifier les fichiers</a>
 </p>
 
 ---
@@ -73,7 +73,7 @@ dupliquer, tourner ou extraire ensemble. [Mode d’emploi](PAGES.md).
 | --- | --- |
 | Téléchargez l’**installeur EXE**, puis suivez l’assistant en français. | Téléchargez le **ZIP portable**, extrayez-le entièrement, puis ouvrez **PDFnorris.exe**. |
 | Installation pour votre compte Windows, avec raccourcis. | Aucun interpréteur ni installation supplémentaire nécessaire. |
-| [**Télécharger l’installeur**](https://github.com/jossmair/PDFnorris/releases/download/v1.00/PDFnorris-1.0.0-Setup.exe) | [**Télécharger le portable**](https://github.com/jossmair/PDFnorris/releases/download/v1.00/PDFnorris-1.0.0-portable-exe-windows-x64.zip) |
+| [**Télécharger l’installeur**](https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-Setup.exe) | [**Télécharger le portable**](https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-portable-exe-windows-x64.zip) |
 
 Pour la version portable, lancez le programme **après extraction**, et conservez
 `LICENCES.txt` à ses côtés. Aucun téléchargement n’est nécessaire pendant
@@ -102,7 +102,7 @@ garantie. Relisez vos résultats OCR et vos fichiers convertis.
 Les formules complexes peuvent être conservées comme images dans les exports Office.
 Les fichiers dépassant 256 Mio ne sont pas ouverts par cette version.
 
-**243 tests automatisés réussis** pour la version 1.0.0, complétés par des vérifications
+**Tests automatisés réussis** pour la version 1.0.0, complétés par des vérifications
 d’export, de récupération et des fichiers de distribution. Cela ne couvre pas tous
 les PDF, toutes les configurations Windows ou tous les pilotes d’imprimante.
 

@@ -1,5 +1,16 @@
 # Validation de PDFnorris
 
+## V1.01 — contrôle du bouton central et interface
+
+114 tests de l’application passent localement, avec Clippy strict. Ils couvrent
+notamment le traitement natif du bouton central, la navigation sur une page
+entièrement visible, le décodage du logo PNG, le centrage d’une page isolée,
+la saisie dans les cellules et les confirmations de fermeture.
+Le ZIP et le cycle installation/désinstallation du setup sont vérifiés.
+Le test physique du bouton central avec la souris de l’utilisateur reste à confirmer.
+Les contrôles GitHub Windows et RustSec doivent réussir avant publication.
+
+
 ## V1.00 — édition, OCR et exports
 
 **243 tests automatisés réussis.** Les régressions synthétiques couvrent les
