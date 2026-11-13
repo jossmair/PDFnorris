@@ -1,40 +1,21 @@
-# Identité PDFnorris
+# Ressources graphiques de PDFnorris
 
-`pdfnorris.svg` : identité vectorielle originale créée pour PDFnorris le
-21 octobre 2026, sous MIT OU Apache-2.0. Document blanc, monogramme P et crayon
-cyan sur un carré bleu/violet arrondi. Le SVG est utilisé dans la barre de titre.
+## Présentation actuelle du dépôt
 
-`examples/app_icon.rs` produit déterministement `pdfnorris.png` (1024 × 1024,
-alpha conservé) et `pdfnorris.ico` (16, 20, 24, 32, 40, 48, 64, 128, 256 pixels).
-Le PNG est l’icône de fenêtre ; le fichier ICO est incorporé à l’exécutable par
-`build.rs` avec le compilateur de ressources du Windows SDK. Le vérificateur
-`scripts/verify_executable_icon.py` compare les images contenues dans le PE aux
-images de l’ICO. L’ancien logo raster pastel généré avec ImageGen a été remplacé.
+- `pdfnorris-logo.png` : visuel fourni par le propriétaire du dépôt pour la présentation GitHub. Copie du fichier fourni, sans retouche. Ce logo de présentation est distinct du visuel incorporé à la V1.01.
+- `screenshots/*-v101.png` : cinq captures originales de la V1.01 fournies pour cette présentation ; leur contenu n’a pas été retouché. Voir [leur descriptif](screenshots/README.md).
+- `telecharger-installateur.svg` et `telecharger-portable.svg` : boutons vectoriels de téléchargement, avec les liens définis dans le README.
 
-Les 51 pictogrammes d’outils utilisés sont des SVG originaux dans `assets/icons/`, créés
-pour PDFnorris les 20 et 21 octobre 2026 sous la licence du projet. Ils utilisent une
-grille de 32 unités, des formes pleines, des angles arrondis et des dégradés en
-deux tons. Bleu/cyan pour les commandes, rose pour l’édition, violet pour les
-pages et le texte, turquoise pour les images, jaune pour le surlignage.
-Aucune bibliothèque d’icônes ni icône de logiciel tiers n’est utilisée.
-`src/icons.rs` les charge depuis l’exécutable et demande un rendu à la résolution
-réelle de l’écran. Le test automatisé vérifie les 52 SVG utilisés, marque comprise,
-à 96 × 96 pixels. Annuler et Rétablir ont été redessinés avec des courbes ouvertes
-et des pointes équilibrées le 21 octobre 2026.
-La Main reprend la même grille, les contours arrondis et le dégradé bleu/cyan.
-Copier, Coller et Ajouter des PDF suivent également cette grille et ces dégradés,
-avec des silhouettes distinctes de feuilles, presse-papiers et document avec plus.
-Les libellés sont fournis aux technologies d’assistance et dans les infobulles.
+## Ressources incorporées au logiciel
 
-L’ancien atlas raster `icons-atlas.png` est un essai de création original généré
-avec ImageGen. Il n’est ni utilisé ni embarqué par l’application actuelle.
+- `pdfnorris.svg`, `pdfnorris.png` et `pdfnorris.ico` : icône orange du logiciel. Le fichier ICO est incorporé à l’exécutable par `build.rs` ; les formats PNG et ICO sont générés par `examples/app_icon.rs`.
+- `pdfnorris-welcome.png` : visuel d’accueil fourni pour l’application, conservé avec sa transparence.
+- `icons/*.svg` : 58 pictogrammes vectoriels redessinés pour PDFnorris sur une grille de 32 unités. La palette orange et anthracite utilise des reflets et une ombre courte. Les zones de filtre sont explicites pour préserver les traits horizontaux.
 
-Les créations propres à PDFnorris sont distribuées sous MIT OU Apache-2.0.
+Les SVG sont rendus à la résolution effective par `src/icons.rs`. Les tests couvrent leur rendu ainsi que la visibilité des commandes horizontales. Le décodage du logo d’accueil est également testé.
 
-Dessin, Trait, Cercle, Carré, Rectangle et Tableau utilisent le même dégradé
-violet et la même grille. Les chevrons Haut/Bas suivent les chevrons de
-navigation bleu/cyan. Ces SVG originaux ont été créés pour la version 0.5.0.
-Le pictogramme Pages de l’ancien bouton de miniatures n’est plus embarqué.
+## Éléments historiques
 
-Page blanche (0.5.1) : document bleu clair, coin replié et plus turquoise.
-Ce SVG original suit la grille 32 unités et les couleurs de la navigation.
+`lecture.png`, `modifier.png`, `pages.png`, `banniere.svg` et `icons-atlas.png` appartiennent à des présentations antérieures. Ils ne sont plus utilisés par le README actuel. L’atlas est un essai généré avec ImageGen, non incorporé au logiciel.
+
+Les attributions et licences des composants tiers restent conservées dans les mentions légales du projet et des distributions.

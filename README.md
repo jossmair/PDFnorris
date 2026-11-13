@@ -1,125 +1,124 @@
 <p align="center">
-  <img src="assets/banniere.svg" alt="PDFnorris — Aucun PDF ne lui résiste." width="100%">
+  <img src="assets/pdfnorris-logo.png" alt="PDFnorris — Aucun PDF ne lui résiste." width="420">
+</p>
+
+<h1 align="center">Vos PDF. À votre main.</h1>
+
+<p align="center">
+  Corrigez une phrase. Annotez un cours. Remettez vos pages dans le bon ordre.<br>
+  <strong>Un espace simple pour travailler sur vos PDF, directement sur votre PC.</strong>
 </p>
 
 <p align="center">
-  <strong>Lisez. Modifiez. Organisez.</strong><br>
-  Corrigez un texte, annotez un cours, réorganisez vos pages et repartez avec le bon document.
+  <strong>Gratuit</strong> &nbsp;·&nbsp; <strong>Local et hors ligne</strong> &nbsp;·&nbsp; <strong>Sans compte</strong> &nbsp;·&nbsp; Windows 10 / 11 x64
 </p>
 
 <p align="center">
-  <strong>Gratuit</strong> &nbsp;·&nbsp; <strong>Hors ligne</strong> &nbsp;·&nbsp; <strong>Sans compte</strong> &nbsp;·&nbsp; Windows 10 / 11 x64
-</p>
-
-<p align="center">
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-Setup.exe"><img src="assets/telecharger-installateur.svg" alt="Télécharger l’installeur Windows — EXE" width="310"></a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-Setup.exe"><img src="assets/telecharger-installateur.svg" alt="Installer PDFnorris V1.01 pour Windows" width="310"></a>
   &nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-portable-exe-windows-x64.zip"><img src="assets/telecharger-portable.svg" alt="Télécharger la version portable — ZIP" width="310"></a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-portable-exe-windows-x64.zip"><img src="assets/telecharger-portable.svg" alt="Télécharger le ZIP portable V1.01" width="310"></a>
 </p>
 
 <p align="center">
-  Version <strong>V1.01</strong> &nbsp;·&nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/latest">Tous les téléchargements</a> &nbsp;·&nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/SHA256SUMS.txt">Vérifier les fichiers</a>
+  <strong>V1.01</strong> &nbsp;·&nbsp;
+  <a href="https://github.com/jossmair/PDFnorris/releases/tag/v1.01">Les nouveautés</a> &nbsp;·&nbsp;
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/SHA256SUMS.txt">Empreintes SHA-256</a> &nbsp;·&nbsp;
+  <a href="#bien-démarrer">Bien démarrer</a>
 </p>
 
 ---
 
-## Corrigez votre document, directement sur la page
+## Corrigez le document, directement sur la page
 
-Une phrase à changer, un titre à mettre en valeur, une précision à ajouter ?
-Modifiez les blocs de texte reconnus à leur emplacement et retrouvez les réglages
-de police, de taille, de couleur et d’alignement à droite.
+Sélectionnez un bloc, modifiez son texte et ajustez sa mise en forme dans le panneau de droite.
+Police, taille, couleurs, alignement, puces et interligne : les réglages restent à portée de main.
 
-Pour ajouter du texte, choisissez **Insérer du texte**, puis glissez sur la page
-pour définir l'emplacement et les dimensions du cadre. Les boutons de zoom
-gardent le point central du document pendant l'édition.
+[![Modification d’un PDF dans la V1.01 : bloc de texte sélectionné et panneau de mise en forme](assets/screenshots/modifier-v101.png)](assets/screenshots/modifier-v101.png)
 
-Un schéma groupé ? Dans Modifier, faites un clic droit puis **Dissocier le schéma**
-pour accéder à ses éléments compatibles. [Voir le fonctionnement et les limites](GROUPS.md).
+<p align="center"><sub>Une vraie capture de PDFnorris V1.01. Cliquez sur les images pour les afficher en grand.</sub></p>
 
-![Modifier un texte dans PDFnorris : blocs sélectionnables et réglages de mise en forme](assets/modifier.png)
+## Trois modes. Le bon outil au bon moment.
 
-## Un espace pour lire et annoter
+| **Lecture** | **Modifier** | **Pages** |
+| :--- | :--- | :--- |
+| Lire, rechercher, surligner et commenter. | Corriger un texte, ajouter une image, dessiner et compléter un tableau. | Assembler des PDF, réordonner, dupliquer, tourner ou extraire des pages. |
 
-Parcourez vos documents avec les miniatures, la recherche, le zoom et l’outil Main.
-Ajoutez un surlignage ou un commentaire pour retrouver l’essentiel.
+<table>
+  <tr>
+    <td width="50%">
+      <strong>Lire et annoter</strong><br>
+      Le document au centre, les commandes à gauche.<br><br>
+      <a href="assets/screenshots/lecture-v101.png"><img src="assets/screenshots/lecture-v101.png" alt="Mode Lecture de PDFnorris V1.01 avec miniatures et outils orange" width="100%"></a>
+    </td>
+    <td width="50%">
+      <strong>Réorganiser d’un geste</strong><br>
+      Un aperçu de déplacement et un repère d’insertion visibles.<br><br>
+      <a href="assets/screenshots/pages-v101.png"><img src="assets/screenshots/pages-v101.png" alt="Glisser-déposer d’une page avec aperçu et repère d’insertion orange" width="100%"></a>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <strong>Dessiner et compléter</strong><br>
+      Traits, formes et tableaux ; couleur et épaisseur au choix.<br><br>
+      <a href="assets/screenshots/dessin-v101.png"><img src="assets/screenshots/dessin-v101.png" alt="Outil Dessin de PDFnorris V1.01 avec tableau sélectionné et palette de couleurs" width="100%"></a>
+    </td>
+    <td width="50%">
+      <strong>Ouvrir et commencer</strong><br>
+      Glissez votre PDF dans la fenêtre ou choisissez un fichier.<br><br>
+      <a href="assets/screenshots/accueil-v101.png"><img src="assets/screenshots/accueil-v101.png" alt="Accueil clair de PDFnorris V1.01 avec son logo et la commande Ouvrir" width="100%"></a>
+    </td>
+  </tr>
+</table>
 
-![Mode Lecture de PDFnorris avec les outils à gauche et la page au centre](assets/lecture.png)
+## Et pour aller plus loin
 
-## Vos pages dans le bon ordre
+| Votre besoin | Dans PDFnorris |
+| :--- | :--- |
+| **Retrouver le texte d’un scan** | OCR local pour transformer les zones reconnues en texte modifiable. Une relecture reste nécessaire. |
+| **Reprendre le travail dans Word ou LibreOffice** | Export d’une copie en **DOCX ou ODT**. La fidélité dépend du PDF ; certaines formules complexes sont conservées comme images. |
+| **Composer un document** | Insérez du texte en dessinant son cadre, ajoutez des images et utilisez le rognage par clic droit. |
+| **Compléter un tableau dessiné** | Cliquez dans une cellule en mode Modifier ou Dessin pour saisir du texte. |
+| **Travailler entre plusieurs PDF** | Plusieurs onglets, transfert de pages et copier-coller de blocs compatibles. |
 
-Glissez les miniatures pour réorganiser un document. Ajoutez d’autres PDF,
-tournez une page ou insérez une page blanche pour préparer votre version finale.
-Sélectionnez plusieurs miniatures avec **Ctrl** ou **Maj** pour les déplacer,
-dupliquer, tourner ou extraire ensemble. [Mode d’emploi](PAGES.md).
+[Gestion des pages](PAGES.md) · [Objets et schémas groupés](GROUPS.md) · [Validation et limites](VALIDATION.md)
 
-![Réorganisation des pages par glisser-déposer : aperçu de la page déplacée et repère d’insertion](assets/pages.png)
+## Bien démarrer
 
-## Un outil pour chaque étape
+| **Sur votre PC** | **À emporter** |
+| :--- | :--- |
+| [Téléchargez l’installeur Windows](https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-Setup.exe), puis suivez l’assistant. | [Téléchargez le ZIP portable](https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-portable-exe-windows-x64.zip), puis extrayez-le entièrement. |
+| Installation pour votre compte utilisateur. | Lancez **PDFnorris.exe** dans le dossier extrait et gardez **LICENCES.txt** à ses côtés. |
 
-| Ce que vous voulez faire | Ce que PDFnorris propose |
-| --- | --- |
-| **Retoucher un document** | Modifier ou insérer du texte, régler les styles, ajouter des puces et ajuster les interlignes. |
-| **Travailler sur un scan** | Reconnaissance OCR locale du texte des images, puis création de blocs modifiables. Une relecture reste nécessaire. |
-| **Illustrer et compléter** | Images avec rognage par clic droit, traits, formes et tableaux avec réglages de couleur et d’épaisseur. |
-| **Assembler vos contenus** | Ajout de PDF, déplacement des pages et des onglets, copier-coller de blocs entre documents. |
-| **Continuer dans un traitement de texte** | Exporter une copie éditable en **DOCX ou ODT**, avec reconstruction de la disposition. |
-| **Garder la main sur votre travail** | Annuler/rétablir, enregistrer sous un autre nom et récupérer le travail après une interruption. |
-
-## Prêt en quelques clics
-
-| **Installer PDFnorris** | **L’emporter avec vous** |
-| --- | --- |
-| Téléchargez l’**installeur EXE**, puis suivez l’assistant en français. | Téléchargez le **ZIP portable**, extrayez-le entièrement, puis ouvrez **PDFnorris.exe**. |
-| Installation pour votre compte Windows, avec raccourcis. | Aucun interpréteur ni installation supplémentaire nécessaire. |
-| [**Télécharger l’installeur**](https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-Setup.exe) | [**Télécharger le portable**](https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-portable-exe-windows-x64.zip) |
-
-Pour la version portable, lancez le programme **après extraction**, et conservez
-`LICENCES.txt` à ses côtés. Aucun téléchargement n’est nécessaire pendant
-l’installation ou l’utilisation du logiciel.
-
-## Le code est disponible
-
-Retrouvez les sources Rust, les tests, les ressources et les dépendances locales
-directement dans ce dépôt. Pour reconstruire l’application ou préparer une
-distribution Windows, suivez le [guide de compilation](BUILDING.md).
-
-Les priorités de développement sont suivies dans la [feuille de route](ROADMAP.md).
-Pour proposer un correctif, consultez [CONTRIBUTING.md](CONTRIBUTING.md) ; pour un
-problème sensible, suivez [SECURITY.md](SECURITY.md).
-
-[Code source V1.00](https://github.com/jossmair/PDFnorris/tree/v1.00) · [Archive des sources](https://github.com/jossmair/PDFnorris/archive/refs/tags/v1.00.zip)
+**Windows 10 / 11, 64 bits.** Aucun compte ni abonnement n’est nécessaire.
+L’OCR utilise les langues compatibles installées dans Windows.
 
 <details>
-<summary><strong>Compatibilité, vérifications et limites connues</strong></summary>
+<summary><strong>À savoir avant de télécharger</strong></summary>
 
-Windows 10/11 x64. Les exécutables ne sont pas signés Authenticode.
-L’OCR nécessite une langue de reconnaissance disponible dans Windows ; sa qualité
-dépend de l’image. La modification et l’export Office dépendent de la structure du
-PDF et des polices : une reproduction identique de tous les documents n’est pas
-garantie. Relisez vos résultats OCR et vos fichiers convertis.
-Les formules complexes peuvent être conservées comme images dans les exports Office.
-Les fichiers dépassant 256 Mio ne sont pas ouverts par cette version.
+- Les exécutables ne sont pas signés Authenticode.
+- L’édition dépend de la structure du PDF et des polices disponibles. Tous les objets ne se modifient pas de la même manière.
+- L’OCR et les exports DOCX/ODT demandent une vérification : une copie parfaitement identique de tout PDF n’est pas garantie.
+- La limite d’ouverture de cette version est de 256 Mio.
+- Le traitement du clic molette a été repris dans la V1.01. Le test physique avec la souris à l’origine du signalement reste à confirmer.
 
-**Tests automatisés réussis** pour la version 1.0.0, complétés par des vérifications
-d’export, de récupération et des fichiers de distribution. Cela ne couvre pas tous
-les PDF, toutes les configurations Windows ou tous les pilotes d’imprimante.
-
-[Notes de version et limites détaillées](CHANGELOG.md) · [Validation](VALIDATION.md) · [Audit de l’interface](AUDIT-INTERFACE.md)
+[Notes de version](https://github.com/jossmair/PDFnorris/releases/tag/v1.01) · [Vérifications détaillées](VALIDATION.md)
 
 </details>
 
+## Ouvert aux retours. Ouvert aux contributions.
+
+Un problème ou une idée d’amélioration ? [Ouvrez un signalement](https://github.com/jossmair/PDFnorris/issues).
+Indiquez la version et les étapes à reproduire ; utilisez un exemple sans données personnelles.
+
+Le code Rust, les tests et les ressources sont disponibles dans ce dépôt.
+
+[Sources V1.01](https://github.com/jossmair/PDFnorris/tree/v1.01) · [Compiler le logiciel](BUILDING.md) · [Contribuer](CONTRIBUTING.md) · [Feuille de route](ROADMAP.md) · [Sécurité](SECURITY.md)
+
 ---
 
 <p align="center">
-  <strong>Un retour, une idée, un problème ?</strong><br>
-  <a href="https://github.com/jossmair/PDFnorris/issues">Ouvrir un signalement</a> &nbsp;·&nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/latest">Télécharger PDFnorris</a>
+  <strong>Prêt à reprendre la main sur vos PDF ?</strong><br><br>
+  <a href="https://github.com/jossmair/PDFnorris/releases/latest"><strong>Télécharger PDFnorris V1.01 →</strong></a>
 </p>
 
-Ce dépôt contient le code source, les versions Windows, leur documentation et
-les captures de présentation. Les mentions légales des composants accompagnent les téléchargements.
-Ne joignez pas de document contenant des informations personnelles à un signalement public.
-
-PDFnorris est issu de [PDFinator](https://github.com/jossmair/PDFinator), développé dans la suite Ergonatus. Les attributions des composants restent dans les mentions légales.
+<p align="center"><sub>Un logiciel de la suite Ergonatus. Issu de <a href="https://github.com/jossmair/PDFinator">PDFinator</a>.<br>Les licences et attributions des composants sont conservées dans les distributions.</sub></p>
