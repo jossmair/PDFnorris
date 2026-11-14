@@ -264,6 +264,19 @@ impl App {
                         self.fit = Fit::Page;
                     }
                 });
+                if self.workspace == Workspace::Read {
+                    rail_row(ui, cell, |ui| {
+                        if action(
+                            ui,
+                            Icon::Fullscreen,
+                            "Lecture plein écran · F11",
+                            false,
+                            enabled,
+                        ) {
+                            self.set_fullscreen(&ctx, true);
+                        }
+                    });
+                }
             });
     }
     fn thumbnails(&mut self, root: &mut egui::Ui) {
@@ -800,8 +813,17 @@ impl App {
                 self.finish_text();
             }
         }
+        self.fullscreen_keys(&ctx);
         self.page_drag_input(&ctx);
         self.shortcuts(&ctx);
+        if self.fullscreen.active {
+            if self.editor.is_none() {
+                self.set_fullscreen(&ctx, false);
+            } else if self.workspace != Workspace::Read || self.tool != Tool::Hand {
+                self.set_tool(&ctx, Tool::Hand);
+                self.workspace = Workspace::Read;
+            }
+        }
         for error in self.raster.poll(&ctx) {
             self.message = Some(error);
         }
@@ -842,13 +864,20 @@ impl App {
             self.drag = None;
         }
         ctx.data_mut(|d| d.insert_temp(egui::Id::new("animations"), self.animations));
-        self.tabs(root);
+        if !self.fullscreen.active {
+            self.tabs(root);
+        }
         self.work_status(root);
         self.export_status(root);
-        self.tools(root);
-        self.thumbnails(root);
-        // Fit and centering use the space that remains after the property panel.
-        self.right_panel(root);
+        if !self.fullscreen.active {
+            self.tools(root);
+            self.thumbnails(root);
+            // Fit and centering use the space that remains after the property panel.
+            self.right_panel(root);
+        } else {
+            self.right_rect = Rect::NOTHING;
+            self.thumbnail_visible.clear();
+        }
         let remaining = (root.available_width() - 24.).max(1.);
         let pane = if self.right_rect.is_positive() {
             self.right_rect.width()
@@ -874,6 +903,9 @@ impl App {
             self.pages_canvas(root);
         } else {
             self.document_canvas(root);
+        }
+        if self.fullscreen.active {
+            self.fullscreen_controls(&ctx);
         }
         if self.printing.open {
             self.print_dialog(&ctx);

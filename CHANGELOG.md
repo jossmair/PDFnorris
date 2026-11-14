@@ -1,5 +1,12 @@
 # PDFnorris — notes de version
 
+## V1.05
+
+- Lecture plein écran avec une icône dédiée, le raccourci F11 et la main activée par défaut, y compris après un changement d’onglet.
+- Barre d’onglets flottante centrée, avec fond clair, texte foncé et repère orange sur le document actif.
+- Onglets escamotables au bord supérieur et curseur de zoom vertical au bord gauche, sans changement de cadrage au survol.
+- Sortie par la croix en haut à droite ou Échap.
+
 ## V1.04
 
 - Panneau de réglages : les commandes de repli et de réouverture utilisent un fond crème discret, un contour gris fin et un chevron orange, adaptés au panneau clair.

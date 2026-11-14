@@ -2316,66 +2316,74 @@ fn dismissing_search_removes_only_temporary_highlights() {
 
 #[test]
 fn hand_pans_the_view_on_both_axes_without_editing_or_selecting_text() {
-    let (ctx, mut app) = setup();
-    app.fit = Fit::Manual;
-    app.zoom = 2.;
-    app.thumbnails = false;
-    app.scroll_offset = Vec2::new(150., 200.);
-    assert!(app.set_tool(&ctx, Tool::Hand));
-    for _ in 0..2 {
-        let mut out = ctx.run_ui(Default::default(), |ui| app.frame_ui(ui));
-        out.textures_delta.clear();
-    }
-    let before = app.editor.as_ref().unwrap().bytes.clone();
-    let offset = app.scroll_offset;
-    let start = app.canvas.center();
-    let end = start - Vec2::new(70., 95.);
-    for (stage, events) in [
-        vec![
-            egui::Event::PointerMoved(start),
-            egui::Event::PointerButton {
-                pos: start,
-                button: egui::PointerButton::Primary,
-                pressed: true,
-                modifiers: Modifiers::NONE,
-            },
-        ],
-        vec![egui::Event::PointerMoved(end)],
-        vec![egui::Event::PointerButton {
-            pos: end,
-            button: egui::PointerButton::Primary,
-            pressed: false,
-            modifiers: Modifiers::NONE,
-        }],
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let mut out = ctx.run_ui(
-            egui::RawInput {
-                events,
-                ..Default::default()
-            },
-            |ui| app.frame_ui(ui),
-        );
-        out.textures_delta.clear();
-        if stage == 1 {
-            assert!(
-                (app.scroll_offset.x - offset.x - 70.).abs() < 1.,
-                "Horizontal pan: {:?}",
-                app.scroll_offset
-            );
-            assert!(
-                (app.scroll_offset.y - offset.y - 95.).abs() < 1.,
-                "Vertical pan: {:?}",
-                app.scroll_offset
-            );
-            assert_eq!(out.platform_output.cursor_icon, egui::CursorIcon::Grabbing);
+    for fullscreen in [false, true] {
+        let (ctx, mut app) = setup();
+        app.fit = Fit::Manual;
+        // Leave room on both axes so the drag does not reach a scroll boundary.
+        app.zoom = if fullscreen { 3. } else { 2. };
+        app.thumbnails = false;
+        app.scroll_offset = Vec2::new(150., 200.);
+        if fullscreen {
+            app.set_fullscreen(&ctx, true);
+            assert!(app.tool == Tool::Hand);
+        } else {
+            assert!(app.set_tool(&ctx, Tool::Hand));
         }
+        for _ in 0..2 {
+            let mut out = ctx.run_ui(Default::default(), |ui| app.frame_ui(ui));
+            out.textures_delta.clear();
+        }
+        let before = app.editor.as_ref().unwrap().bytes.clone();
+        let offset = app.scroll_offset;
+        let start = app.canvas.center();
+        let end = start - Vec2::new(70., 95.);
+        for (stage, events) in [
+            vec![
+                egui::Event::PointerMoved(start),
+                egui::Event::PointerButton {
+                    pos: start,
+                    button: egui::PointerButton::Primary,
+                    pressed: true,
+                    modifiers: Modifiers::NONE,
+                },
+            ],
+            vec![egui::Event::PointerMoved(end)],
+            vec![egui::Event::PointerButton {
+                pos: end,
+                button: egui::PointerButton::Primary,
+                pressed: false,
+                modifiers: Modifiers::NONE,
+            }],
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let mut out = ctx.run_ui(
+                egui::RawInput {
+                    events,
+                    ..Default::default()
+                },
+                |ui| app.frame_ui(ui),
+            );
+            out.textures_delta.clear();
+            if stage == 1 {
+                assert!(
+                    (app.scroll_offset.x - offset.x - 70.).abs() < 1.,
+                    "Horizontal pan: {:?}",
+                    app.scroll_offset
+                );
+                assert!(
+                    (app.scroll_offset.y - offset.y - 95.).abs() < 1.,
+                    "Vertical pan: {:?}",
+                    app.scroll_offset
+                );
+                assert_eq!(out.platform_output.cursor_icon, egui::CursorIcon::Grabbing);
+            }
+        }
+        assert_eq!(app.editor.as_ref().unwrap().bytes, before);
+        assert!(app.selected.is_none() && app.text_selection.is_none());
+        assert!(!app.editor.as_ref().unwrap().can_undo());
     }
-    assert_eq!(app.editor.as_ref().unwrap().bytes, before);
-    assert!(app.selected.is_none() && app.text_selection.is_none());
-    assert!(!app.editor.as_ref().unwrap().can_undo());
 }
 
 #[test]
@@ -5523,4 +5531,145 @@ fn native_middle_hook_moves_a_fitting_page_without_delivering_clicks_to_widgets(
     assert!(!app.middle_panning && !app.middle_input.down);
     assert_eq!(app.editor.as_ref().unwrap().bytes, before);
     assert!(app.tool == Tool::Edit);
+}
+
+#[test]
+fn fullscreen_hover_controls_do_not_resize_or_zoom_the_document_and_exit_safely() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    let frame = |app: &mut App, p: Pos2| {
+        let mut out = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, Vec2::new(1080., 720.))),
+                events: vec![egui::Event::PointerMoved(p)],
+                ..Default::default()
+            },
+            |ui| app.frame_ui(ui),
+        );
+        out.textures_delta.clear();
+        out
+    };
+    app.set_fullscreen(&ctx, true);
+    assert!(app.fullscreen.active);
+    for _ in 0..3 {
+        frame(&mut app, Pos2::new(500., 350.));
+    }
+    let canvas = app.canvas;
+    let zoom = app.zoom;
+    assert!(!app.fullscreen.top_visible && !app.fullscreen.zoom_visible);
+    assert!(!app.right_rect.is_positive());
+    assert!(canvas.width() > 1000.);
+    for p in [
+        Pos2::new(500., 3.),
+        Pos2::new(500., 30.),
+        Pos2::new(4., 350.),
+    ] {
+        for _ in 0..3 {
+            frame(&mut app, p);
+        }
+        assert_eq!(app.canvas, canvas);
+        assert!((app.zoom - zoom).abs() < 0.001);
+    }
+    assert!(app.fullscreen.zoom_visible);
+    frame(&mut app, Pos2::new(500., 350.));
+    assert!(!app.fullscreen.zoom_visible);
+    click_named_control(&ctx, &mut app, "Quitter le plein écran · Échap");
+    assert!(!app.fullscreen.active);
+    assert!(!app.close_confirmed);
+    assert!(app.editor.is_some());
+}
+
+#[test]
+fn fullscreen_keyboard_and_document_switch_keep_reading_mode() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    app.editor.as_mut().unwrap().path = Some(PathBuf::from("Premier.pdf"));
+    app.documents.clear();
+    let original = app.editor.take().unwrap();
+    app.insert_document(original);
+    let bytes = app.editor.as_ref().unwrap().bytes.clone();
+    app.insert_document(Editor::from_bytes(bytes.to_vec()).unwrap());
+    app.editor.as_mut().unwrap().path = Some(PathBuf::from("Second.pdf"));
+    app.set_workspace(&ctx, Workspace::Edit);
+    app.set_fullscreen(&ctx, true);
+    assert!(app.workspace == Workspace::Read && app.tool == Tool::Hand);
+    for _ in 0..3 {
+        input_frame(
+            &ctx,
+            &mut app,
+            vec![egui::Event::PointerMoved(Pos2::new(500., 3.))],
+        );
+    }
+    click_named_control(&ctx, &mut app, "Premier.pdf");
+    assert_eq!(app.active_document, 0);
+    assert!(app.tool == Tool::Hand);
+    click_named_control(&ctx, &mut app, "Second.pdf");
+    assert_eq!(app.active_document, 1);
+    assert!(app.tool == Tool::Hand);
+    let key = |key, modifiers| egui::Event::Key {
+        key,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers,
+    };
+    input_frame(&ctx, &mut app, vec![key(Key::Tab, Modifiers::CTRL)]);
+    assert_eq!(app.active_document, 0);
+    assert!(app.fullscreen.active && app.workspace == Workspace::Read && app.tool == Tool::Hand);
+    input_frame(&ctx, &mut app, vec![key(Key::Escape, Modifiers::NONE)]);
+    assert!(!app.fullscreen.active);
+    assert!(!app.close_confirmed);
+    input_frame(&ctx, &mut app, vec![key(Key::F11, Modifiers::NONE)]);
+    assert!(app.fullscreen.active);
+}
+
+#[test]
+fn fullscreen_vertical_slider_changes_only_the_view_and_retracts_after_drag() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    app.set_fullscreen(&ctx, true);
+    let original = app.editor.as_ref().unwrap().bytes.clone();
+    for _ in 0..3 {
+        input_frame(
+            &ctx,
+            &mut app,
+            vec![egui::Event::PointerMoved(Pos2::new(3., 300.))],
+        );
+    }
+    let out = input_frame(&ctx, &mut app, vec![]);
+    let nodes = &out.platform_output.accesskit_update.as_ref().unwrap().nodes;
+    let bounds = nodes
+        .iter()
+        .find(|(_, n)| n.label() == Some("Zoom du PDF"))
+        .expect("The zoom slider must have an accessible label")
+        .1
+        .bounds()
+        .unwrap();
+    let old_zoom = app.zoom;
+    let point = Pos2::new(((bounds.x0 + bounds.x1) / 2.) as f32, bounds.y0 as f32 + 4.);
+    for pressed in [true, false] {
+        input_frame(
+            &ctx,
+            &mut app,
+            vec![
+                egui::Event::PointerMoved(point),
+                egui::Event::PointerButton {
+                    pos: point,
+                    button: egui::PointerButton::Primary,
+                    pressed,
+                    modifiers: Modifiers::NONE,
+                },
+            ],
+        );
+    }
+    assert!(app.zoom > old_zoom);
+    assert!(app.fit == Fit::Manual);
+    assert_eq!(app.editor.as_ref().unwrap().bytes, original);
+    input_frame(
+        &ctx,
+        &mut app,
+        vec![egui::Event::PointerMoved(Pos2::new(500., 350.))],
+    );
+    input_frame(&ctx, &mut app, vec![]);
+    assert!(!app.fullscreen.zoom_visible);
 }

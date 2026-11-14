@@ -10,6 +10,7 @@ mod drafts;
 mod drawing;
 mod drawing_style;
 mod export;
+mod fullscreen;
 mod inline;
 mod layout;
 mod marquee;
@@ -215,6 +216,7 @@ pub struct App {
     inline: Option<inline::Inline>,
     drag: Option<Drag>,
     zoom: f32,
+    fullscreen: fullscreen::State,
     fit: Fit,
     page: usize,
     jump: Option<usize>,
@@ -278,6 +280,7 @@ impl App {
             inline: None,
             drag: None,
             zoom: 1.,
+            fullscreen: Default::default(),
             fit: Fit::Width,
             page: 0,
             jump: None,

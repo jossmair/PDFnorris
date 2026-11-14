@@ -1,5 +1,13 @@
 # Validation de PDFnorris
 
+## En préparation — lecture plein écran
+
+Les tests d’interface simulée couvrent l’apparition et la rétraction des commandes,
+la stabilité du cadrage au survol, la croix de sortie, F11 et Échap, le changement
+d’onglet et la manipulation réelle du curseur vertical sans modifier les octets PDF.
+Le contrôle Clippy strict passe. La bascule native de fenêtre reste à confirmer
+par une utilisation interactive sur le poste.
+
 ## V1.04 — icônes sur fond clair
 
 Le rendu des commandes est vérifié sur fond clair. Le test de repli et de

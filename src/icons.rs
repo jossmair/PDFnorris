@@ -56,6 +56,7 @@ pub enum Icon {
     OfficeExport,
     PanelCollapse,
     PanelExpand,
+    Fullscreen,
 }
 pub const INK: Color32 = Color32::from_rgb(30, 49, 73);
 pub const ACCENT: Color32 = Color32::from_rgb(226, 101, 15);
@@ -117,6 +118,7 @@ impl Icon {
             Self::OfficeExport => "Exporter en DOCX ou ODT",
             Self::PanelCollapse => "Replier les réglages",
             Self::PanelExpand => "Déplier les réglages",
+            Self::Fullscreen => "Lecture plein écran · F11",
         }
     }
     fn source(self) -> egui::ImageSource<'static> {
@@ -176,6 +178,7 @@ impl Icon {
             Self::OfficeExport => egui::include_image!("../assets/icons/office-export.svg"),
             Self::PanelCollapse => egui::include_image!("../assets/icons/panel-collapse.svg"),
             Self::PanelExpand => egui::include_image!("../assets/icons/panel-expand.svg"),
+            Self::Fullscreen => egui::include_image!("../assets/icons/fullscreen.svg"),
         }
     }
 }
@@ -385,6 +388,7 @@ mod tests {
             Icon::OfficeExport,
             Icon::PanelCollapse,
             Icon::PanelExpand,
+            Icon::Fullscreen,
         ] {
             let loaded = egui::Image::new(icon.source())
                 .fit_to_exact_size(Vec2::splat(96.))

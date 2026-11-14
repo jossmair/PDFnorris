@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "assets/icons"
 ART = {
+    "fullscreen": '<path d="M9 3H3v6m12-6h6v6M3 15v6h6m6 0h6v-6"/><path class="detail" d="M8 8h8v8H8z"/>',
     "panel-collapse": '<rect x="3" y="4" width="18" height="16" rx="3" fill="#fff7ef" stroke="#b9c3cf" stroke-width="1"/><path d="M16 5v14" stroke="#c4ccd6" stroke-width="1"/><path d="m8 8 4 4-4 4" stroke="#d56517" stroke-width="1.6"/>',
     "panel-expand": '<rect x="3" y="4" width="18" height="16" rx="3" fill="#fff7ef" stroke="#b9c3cf" stroke-width="1"/><path d="M16 5v14" stroke="#c4ccd6" stroke-width="1"/><path d="m12 8-4 4 4 4" stroke="#d56517" stroke-width="1.6"/>',
     "open": '<path class="surface" d="M3 8V5.5A1.5 1.5 0 0 1 4.5 4H9l2 2h8a2 2 0 0 1 2 2v1"/><path class="metal" d="M2 10h20l-2.5 9H4z"/><path class="glint" d="M5 12h13"/>',

@@ -14,15 +14,15 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.04/PDFnorris-1.0.4-Setup.exe"><img src="assets/telecharger-installateur.svg" alt="Installer PDFnorris V1.04 pour Windows" width="310"></a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.05/PDFnorris-1.0.5-Setup.exe"><img src="assets/telecharger-installateur.svg" alt="Installer PDFnorris V1.05 pour Windows" width="310"></a>
   &nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.04/PDFnorris-1.0.4-portable-exe-windows-x64.zip"><img src="assets/telecharger-portable.svg" alt="Télécharger le ZIP portable V1.04" width="310"></a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.05/PDFnorris-1.0.5-portable-exe-windows-x64.zip"><img src="assets/telecharger-portable.svg" alt="Télécharger le ZIP portable V1.05" width="310"></a>
 </p>
 
 <p align="center">
-  <strong>V1.04</strong> &nbsp;·&nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/tag/v1.04">Les nouveautés</a> &nbsp;·&nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.04/SHA256SUMS.txt">Empreintes SHA-256</a> &nbsp;·&nbsp;
+  <strong>V1.05</strong> &nbsp;·&nbsp;
+  <a href="https://github.com/jossmair/PDFnorris/releases/tag/v1.05">Les nouveautés</a> &nbsp;·&nbsp;
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.05/SHA256SUMS.txt">Empreintes SHA-256</a> &nbsp;·&nbsp;
   <a href="#bien-démarrer">Bien démarrer</a>
 </p>
 
@@ -39,11 +39,15 @@ Police, taille, couleurs, alignement, puces et interligne : les réglages resten
 
 ## Une nouvelle famille d’icônes
 
-60 pictogrammes vectoriels orange et anthracite, avec des contours fins et des détails cuivrés. Ils restent nets à chaque échelle. La gouttière de défilement des miniatures apparaît uniquement lorsqu’elle est nécessaire.
+61 pictogrammes vectoriels orange et anthracite, avec des contours fins et des détails cuivrés. Ils restent nets à chaque échelle. La gouttière de défilement des miniatures apparaît uniquement lorsqu’elle est nécessaire.
 
-[![Les 60 icônes de PDFnorris V1.04, aperçu en 3840 pixels](assets/icons-4k.png)](assets/icons-4k.png)
+[![Les 61 icônes de PDFnorris, aperçu en 3840 pixels](assets/icons-4k.png)](assets/icons-4k.png)
 
 <sub>Planche de présentation haute définition. L’application utilise les fichiers SVG vectoriels.</sub>
+
+## Lire en plein écran
+
+Dans Lecture, utilisez l’icône plein écran ou **F11**. La main est activée pour déplacer la vue. Les onglets apparaissent dans une barre flottante claire au passage de la souris en haut ; le zoom vertical se révèle sur le bord gauche. La croix en haut à droite ou **Échap** ramène à la vue normale. Ces commandes flottent au-dessus du PDF sans modifier son cadrage lorsqu’elles apparaissent.
 
 ## Trois modes. Le bon outil au bon moment.
 
@@ -94,7 +98,7 @@ Police, taille, couleurs, alignement, puces et interligne : les réglages resten
 
 | **Sur votre PC** | **À emporter** |
 | :--- | :--- |
-| [Téléchargez l’installeur Windows](https://github.com/jossmair/PDFnorris/releases/download/v1.04/PDFnorris-1.0.4-Setup.exe), puis suivez l’assistant. | [Téléchargez le ZIP portable](https://github.com/jossmair/PDFnorris/releases/download/v1.04/PDFnorris-1.0.4-portable-exe-windows-x64.zip), puis extrayez-le entièrement. |
+| [Téléchargez l’installeur Windows](https://github.com/jossmair/PDFnorris/releases/download/v1.05/PDFnorris-1.0.5-Setup.exe), puis suivez l’assistant. | [Téléchargez le ZIP portable](https://github.com/jossmair/PDFnorris/releases/download/v1.05/PDFnorris-1.0.5-portable-exe-windows-x64.zip), puis extrayez-le entièrement. |
 | Installation pour votre compte utilisateur. | Lancez **PDFnorris.exe** dans le dossier extrait et gardez **LICENCES.txt** à ses côtés. |
 
 **Windows 10 / 11, 64 bits.** Aucun compte ni abonnement n’est nécessaire.
@@ -109,7 +113,7 @@ L’OCR utilise les langues compatibles installées dans Windows.
 - La limite d’ouverture de cette version est de 256 Mio.
 - Le traitement du clic molette a été repris dans la V1.01. Le test physique avec la souris à l’origine du signalement reste à confirmer.
 
-[Notes de version](https://github.com/jossmair/PDFnorris/releases/tag/v1.04) · [Vérifications détaillées](VALIDATION.md)
+[Notes de version](https://github.com/jossmair/PDFnorris/releases/tag/v1.05) · [Vérifications détaillées](VALIDATION.md)
 
 </details>
 
@@ -120,7 +124,7 @@ Indiquez la version et les étapes à reproduire ; utilisez un exemple sans donn
 
 Le code Rust, les tests et les ressources sont disponibles dans ce dépôt.
 
-[Sources V1.01](https://github.com/jossmair/PDFnorris/tree/v1.04) · [Compiler le logiciel](BUILDING.md) · [Contribuer](CONTRIBUTING.md) · [Feuille de route](ROADMAP.md) · [Sécurité](SECURITY.md)
+[Sources V1.01](https://github.com/jossmair/PDFnorris/tree/v1.05) · [Compiler le logiciel](BUILDING.md) · [Contribuer](CONTRIBUTING.md) · [Feuille de route](ROADMAP.md) · [Sécurité](SECURITY.md)
 
 ---
 
