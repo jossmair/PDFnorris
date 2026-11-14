@@ -451,13 +451,24 @@ impl App {
         }
         if self.properties_collapsed {
             let panel = egui::Panel::right("properties-collapsed")
-                .exact_size(32.)
+                .exact_size(40.)
                 .resizable(false)
+                .frame(
+                    egui::Frame::new()
+                        .fill(Color32::from_rgb(247, 249, 253))
+                        .inner_margin(4.),
+                )
                 .show(root, |ui| {
-                    if ui
-                        .button("‹")
-                        .on_hover_text("Déplier les réglages")
-                        .clicked()
+                    if icons::button(
+                        ui,
+                        Icon::PanelExpand,
+                        "Déplier les réglages",
+                        false,
+                        true,
+                        32.,
+                    )
+                    .on_hover_text("Déplier les réglages")
+                    .clicked()
                     {
                         self.properties_collapsed = false;
                     }
@@ -479,7 +490,17 @@ impl App {
                 egui::ScrollArea::vertical()
                     .id_salt(("properties-scroll", self.active_document))
                     .show(ui, |ui| {
-                        if ui.button("Replier ›").clicked() {
+                        if icons::button(
+                            ui,
+                            Icon::PanelCollapse,
+                            "Replier les réglages",
+                            false,
+                            true,
+                            32.,
+                        )
+                        .on_hover_text("Replier les réglages")
+                        .clicked()
+                        {
                             self.properties_collapsed = true;
                         }
                         if self.image_crop.is_some() {

@@ -1,5 +1,11 @@
 # PDFnorris — notes de version
 
+## V1.03
+
+- Panneau de réglages : deux pictogrammes vectoriels dédiés remplacent les boutons textuels de repli et de réouverture, avec des détails cuivrés et une surface anthracite.
+- Les commandes conservent une info-bulle et un nom accessible. Le repli préserve l’outil actif et l’adaptation de la page à l’espace disponible.
+- Poursuite des contrôles locaux OCR et DOCX/ODT ; les documents du corpus restent privés.
+
 ## V1.02
 
 - OCR : rétablissement des coordonnées après le redressement Windows, conservation du texte clair sur fond sombre et nettoyage limité aux pixels des lettres.

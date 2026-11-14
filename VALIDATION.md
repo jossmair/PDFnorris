@@ -1,5 +1,13 @@
 # Validation de PDFnorris
 
+## V1.03 — panneau de réglages
+
+Les contrôles simulés vérifient le repli et la réouverture par leurs noms accessibles,
+la conservation de l’outil et du zoom, ainsi que la visibilité des bords en mode
+largeur et page entière sur trois tailles de fenêtre. La famille compte 60 SVG.
+Les tests de corpus OCR et exports restent locaux ; leur réussite technique
+ne constitue pas une garantie de fidélité pour chaque document.
+
 ## V1.02 — OCR, historique et conversion structurée
 
 264 tests automatisés passent localement. Le diagnostic privé optionnel reste

@@ -3560,7 +3560,7 @@ fn collapsing_properties_keeps_the_selected_drawing_tool_and_scale() {
         input_frame(&ctx, &mut app, vec![]);
     }
     let width = app.canvas.width();
-    click_named_control(&ctx, &mut app, "Replier ›");
+    click_named_control(&ctx, &mut app, "Replier les réglages");
     for _ in 0..3 {
         input_frame(&ctx, &mut app, vec![]);
     }
@@ -3568,7 +3568,7 @@ fn collapsing_properties_keeps_the_selected_drawing_tool_and_scale() {
     assert_eq!(app.tool, Tool::Draw);
     assert_eq!(app.zoom, 0.7);
     assert!(app.canvas.width() > width + 150.);
-    click_named_control(&ctx, &mut app, "‹");
+    click_named_control(&ctx, &mut app, "Déplier les réglages");
     for _ in 0..3 {
         input_frame(&ctx, &mut app, vec![]);
     }
@@ -5089,10 +5089,10 @@ fn fitted_page_edges_remain_visible_through_text_panel_collapse_and_expand_at_th
                 assert!(panel_zoom < full_zoom);
             }
             for _ in 0..2 {
-                click_named_control(&ctx, &mut app, "Replier ›");
+                click_named_control(&ctx, &mut app, "Replier les réglages");
                 let collapsed_zoom = check(&ctx, &mut app);
                 assert!(collapsed_zoom >= panel_zoom);
-                click_named_control(&ctx, &mut app, "‹");
+                click_named_control(&ctx, &mut app, "Déplier les réglages");
                 assert!((check(&ctx, &mut app) - panel_zoom).abs() < 0.001);
             }
         }
