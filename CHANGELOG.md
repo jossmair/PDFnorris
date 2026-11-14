@@ -1,5 +1,9 @@
 # PDFnorris — notes de version
 
+## V1.04
+
+- Panneau de réglages : les commandes de repli et de réouverture utilisent un fond crème discret, un contour gris fin et un chevron orange, adaptés au panneau clair.
+
 ## V1.03
 
 - Panneau de réglages : deux pictogrammes vectoriels dédiés remplacent les boutons textuels de repli et de réouverture, avec des détails cuivrés et une surface anthracite.

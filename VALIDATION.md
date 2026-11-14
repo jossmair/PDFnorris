@@ -1,5 +1,11 @@
 # Validation de PDFnorris
 
+## V1.04 — icônes sur fond clair
+
+Le rendu des commandes est vérifié sur fond clair. Le test de repli et de
+réouverture couvre la conservation des bords de page aux trois largeurs.
+Les paquets et les contrôles GitHub doivent être validés avant publication.
+
 ## V1.03 — panneau de réglages
 
 Les contrôles simulés vérifient le repli et la réouverture par leurs noms accessibles,
