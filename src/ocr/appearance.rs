@@ -1,6 +1,71 @@
 //! Recover text size and weight from local font outlines and the source ink.
 use super::{Block, Line};
 
+/// A single OCR character inside textured artwork is often a hole in a large
+/// decorative glyph. Keep those original pixels; ordinary diagram labels on
+/// a uniform background remain editable.
+pub(super) fn ambiguous_fragment(rgba: &[u8], width: u32, height: u32, block: &Block) -> bool {
+    if block.text.trim().chars().count() > 1
+        || width == 0
+        || height == 0
+        || width > 4096
+        || height > 4096
+        || rgba.len() != width as usize * height as usize * 4
+    {
+        return false;
+    }
+    let r = block.rect;
+    if r.iter().any(|v| !v.is_finite()) {
+        return true;
+    }
+    let x0 = r[0].floor().max(0.) as u32;
+    let y0 = r[1].floor().max(0.) as u32;
+    let x1 = r[2].ceil().max(0.).min(width as f32) as u32;
+    let y1 = r[3].ceil().max(0.).min(height as f32) as u32;
+    let mut values = Vec::new();
+    let pad = ((y1.saturating_sub(y0)) / 2).max(4);
+    for y in y0.saturating_sub(pad)..y1.saturating_add(pad).min(height) {
+        for x in x0.saturating_sub(pad)..x1.saturating_add(pad).min(width) {
+            if x < x0 || x >= x1 || y < y0 || y >= y1 {
+                let i = ((y * width + x) * 4) as usize;
+                values.push(
+                    rgba[i] as f64 * 0.2126
+                        + rgba[i + 1] as f64 * 0.7152
+                        + rgba[i + 2] as f64 * 0.0722,
+                );
+            }
+        }
+    }
+    values.sort_by(f64::total_cmp);
+    !values.is_empty() && values[values.len() * 9 / 10] - values[values.len() / 10] > 45.
+}
+
+#[cfg(test)]
+#[test]
+fn diagram_letters_stay_editable_but_holes_in_decorative_art_do_not() {
+    let mut pixels = vec![255; 80 * 80 * 4];
+    let block = Block {
+        text: "P".into(),
+        rect: [30., 30., 50., 50.],
+        size: 23.,
+        bold: false,
+        color: [0.; 3],
+        words: vec![[30., 30., 50., 50.]],
+    };
+    assert!(!ambiguous_fragment(&pixels, 80, 80, &block));
+    // The tiny letter-like hole belongs to a much larger graphic: its local
+    // paper-like surround ends within half a character height.
+    for y in 20..60 {
+        for x in 20..60 {
+            if !(26..54).contains(&x) || !(26..54).contains(&y) {
+                let i = (y * 80 + x) * 4;
+                pixels[i..i + 3].fill(15);
+            }
+        }
+    }
+    assert!(ambiguous_fragment(&pixels, 80, 80, &block));
+}
+
 #[derive(Default)]
 struct Area {
     sum: f64,
@@ -114,13 +179,20 @@ fn ink(rgba: &[u8], width: u32, height: u32, r: [f32; 4]) -> Option<Metrics> {
     border.sort_by(f64::total_cmp);
     let background = border[border.len() / 2];
     let mut darkest = background;
+    let mut brightest = background;
     for y in y0..y1 {
         for x in x0..x1 {
             darkest = darkest.min(luma(x, y));
+            brightest = brightest.max(luma(x, y));
         }
     }
-    let contrast = background - darkest;
-    if contrast < 40. {
+    let foreground = if brightest - background > background - darkest {
+        brightest
+    } else {
+        darkest
+    };
+    let contrast = foreground - background;
+    if contrast.abs() < 40. {
         return None;
     }
     let mut rect = [
@@ -132,7 +204,7 @@ fn ink(rgba: &[u8], width: u32, height: u32, r: [f32; 4]) -> Option<Metrics> {
     let mut area = 0.;
     for y in y0..y1 {
         for x in x0..x1 {
-            let coverage = ((background - luma(x, y)) / contrast).clamp(0., 1.);
+            let coverage = ((luma(x, y) - background) / contrast).clamp(0., 1.);
             area += coverage;
             if coverage > 0.35 {
                 rect[0] = rect[0].min(x as f64);

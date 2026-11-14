@@ -1,5 +1,27 @@
 # Validation de PDFnorris
 
+## V1.02 — OCR, historique et conversion structurée
+
+264 tests automatisés passent localement. Le diagnostic privé optionnel reste
+ignoré dans le lot standard. Le formatage et Clippy strict sont contrôlés.
+Les régressions synthétiques couvrent notamment les coordonnées OCR redressées,
+le texte clair sur photographie, les numéros encadrés, les fractions entre
+colonnes, les bordures de cellules et les séparateurs de page.
+
+Le budget des tampons PDF d’historique est testé entre onglets, avec conservation
+des étapes contiguës d’annulation et de rétablissement. Il ne représente pas
+un plafond de mémoire totale du processus.
+
+Le ZIP portable contient l’exécutable natif x64 et le fichier légal consolidé.
+Son intégrité, ses icônes et ses empreintes sont vérifiées. Le setup est installé
+puis désinstallé en mode de test dans un dossier temporaire avec espaces et accent,
+sans créer de raccourcis ni d’entrée de désinstallation sur le poste.
+
+Les rendus Office sont examinés avec LibreOffice sous Windows. Une validation
+complète avec Microsoft Word, imprimantes réelles et lecteurs d’écran reste à
+réaliser. Les documents et résultats détaillés du corpus ne sont pas publiés.
+Les contrôles GitHub Windows et RustSec doivent réussir avant publication.
+
 ## V1.01 — contrôle du bouton central et interface
 
 114 tests de l’application passent localement, avec Clippy strict. Ils couvrent

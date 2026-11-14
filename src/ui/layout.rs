@@ -276,8 +276,18 @@ impl App {
             .as_ref()
             .map(|e| e.info.pages.clone())
             .unwrap_or_default();
+        let content_height = 8.
+            + pages
+                .iter()
+                .map(|p| {
+                    (78. * p.height / p.width).clamp(35., 150.)
+                        + 32.
+                        + root.spacing().item_spacing.y
+                })
+                .sum::<f32>();
+        let needs_scroll = content_height > (root.available_height() - 18.).max(0.);
         egui::Panel::left("thumbnails")
-            .exact_size(105.)
+            .exact_size(if needs_scroll { 110. } else { 96. })
             .resizable(false)
             .frame(
                 egui::Frame::new()
@@ -285,9 +295,26 @@ impl App {
                     .inner_margin(9.),
             )
             .show(root, |ui| {
+                // Reserve a separate gutter: the handle must never cover a page.
+                let style = ui.style_mut();
+                style.spacing.scroll.floating = false;
+                style.spacing.scroll.bar_width = 6.;
+                style.spacing.scroll.bar_inner_margin = 7.;
+                style.spacing.scroll.bar_outer_margin = 1.;
+                style.spacing.scroll.handle_min_length = 32.;
+                style.spacing.scroll.foreground_color = false;
+                style.visuals.extreme_bg_color = Color32::from_rgb(235, 239, 245);
+                style.visuals.widgets.inactive.bg_fill = Color32::from_rgb(174, 183, 196);
+                style.visuals.widgets.hovered.bg_fill = Color32::from_rgb(225, 139, 66);
+                style.visuals.widgets.active.bg_fill = icons::ACCENT;
                 let reorder = matches!(self.workspace, Workspace::Read | Workspace::Edit);
                 let mut cards = Vec::new();
                 let overview = egui::ScrollArea::vertical()
+                    .scroll_bar_visibility(if needs_scroll {
+                        egui::scroll_area::ScrollBarVisibility::AlwaysVisible
+                    } else {
+                        egui::scroll_area::ScrollBarVisibility::AlwaysHidden
+                    })
                     .id_salt(("page-thumbnails", self.active_document))
                     .show(ui, |ui| {
                         ui.add_space(8.);
@@ -702,6 +729,7 @@ impl App {
         self.refresh_image_clipboard(root.ctx());
         let ctx = root.ctx().clone();
         self.poll_work(&ctx);
+        self.enforce_history_budget(pdfnorris::document::HISTORY_BYTE_BUDGET);
         self.fonts.poll(&ctx);
         let printing_was_busy = self.printing.busy;
         self.printing.poll();

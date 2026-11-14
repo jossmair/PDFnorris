@@ -6,6 +6,47 @@ mod enhancement;
 mod regions;
 pub use regions::{Block, encode_png, erase_letters};
 
+/// Windows reports word boxes in its deskewed image. Bring all four corners
+/// back into the source image before merging recognition passes or erasing ink.
+#[cfg(any(windows, test))]
+fn image_bounds(r: [f32; 4], width: u32, height: u32, angle: f64) -> [f32; 4] {
+    if !angle.is_finite() || angle.abs() < 0.001 {
+        return r;
+    }
+    let (sin, cos) = angle.to_radians().sin_cos();
+    let (cx, cy) = (width as f64 / 2., height as f64 / 2.);
+    let mut out = [
+        f32::INFINITY,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+    ];
+    for (x, y) in [(r[0], r[1]), (r[2], r[1]), (r[0], r[3]), (r[2], r[3])] {
+        let (dx, dy) = (x as f64 - cx, y as f64 - cy);
+        let (x, y) = (
+            (cx + cos * dx - sin * dy) as f32,
+            (cy + sin * dx + cos * dy) as f32,
+        );
+        out = [out[0].min(x), out[1].min(y), out[2].max(x), out[3].max(y)];
+    }
+    out
+}
+
+#[cfg(test)]
+#[test]
+fn rotated_ocr_boxes_return_to_source_image_coordinates() {
+    assert_eq!(
+        image_bounds([10., 20., 30., 40.], 100, 100, 0.),
+        [10., 20., 30., 40.]
+    );
+    let r = image_bounds([60., 40., 80., 50.], 100, 100, 90.);
+    for (actual, expected) in r.into_iter().zip([50., 60., 60., 80.]) {
+        assert!((actual - expected).abs() < 0.001);
+    }
+    let r = image_bounds([2055., 1217., 2204., 1277.], 2380, 1340, -3.4);
+    assert!(r[1] < 1170. && r[0] > 2080., "{r:?}");
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ImageSource {
     Original(usize),
@@ -63,14 +104,24 @@ impl Recognition {
             })
             .map(|l| l.rect)
             .collect();
+        let context = blocks.clone();
         blocks.retain(|block| {
-            !uncertain.iter().any(|r| {
-                let height = (r[3] - r[1]).max(block.rect[3] - block.rect[1]);
-                block.rect[1] < r[3]
-                    && block.rect[3] > r[1]
-                    && (block.rect[0] - r[2]).max(r[0] - block.rect[2]) < height * 2.
-                    && block.rect[3] - block.rect[1] > height * 0.6
-            })
+            let isolated_quote = matches!(block.text.trim(), "'" | "\"" | "`" | "’")
+                && !context.iter().any(|other| {
+                    let h = (block.rect[3] - block.rect[1]).max(other.rect[3] - other.rect[1]);
+                    other.text.chars().any(char::is_alphanumeric)
+                        && (block.rect[0] - other.rect[2]).max(other.rect[0] - block.rect[2]) < h
+                        && (block.rect[1] - other.rect[3]).max(other.rect[1] - block.rect[3]) < h
+                });
+            !isolated_quote
+                && !appearance::ambiguous_fragment(rgba, width, height, block)
+                && !uncertain.iter().any(|r| {
+                    let height = (r[3] - r[1]).max(block.rect[3] - block.rect[1]);
+                    block.rect[1] < r[3]
+                        && block.rect[3] > r[1]
+                        && (block.rect[0] - r[2]).max(r[0] - block.rect[2]) < height * 2.
+                        && block.rect[3] - block.rect[1] > height * 0.6
+                })
         });
         appearance::refine(rgba, width, height, &self.lines, &mut blocks);
         blocks
@@ -380,6 +431,7 @@ fn windows_recognize(rgba: &[u8], width: u32, height: u32) -> Result<Recognition
             BitmapAlphaMode::Ignore,
         )?;
         let result = engine.RecognizeAsync(&bitmap)?.join()?;
+        let angle = result.TextAngle().and_then(|a| a.Value()).unwrap_or(0.);
         let language = engine.RecognizerLanguage()?.LanguageTag()?.to_string();
         let mut lines = Vec::new();
         for line in result.Lines()?.into_iter().take(4096) {
@@ -396,15 +448,21 @@ fn windows_recognize(rgba: &[u8], width: u32, height: u32) -> Result<Recognition
             let mut words = Vec::new();
             for word in line.Words()? {
                 let b = word.BoundingRect()?;
+                let bounds = image_bounds(
+                    [b.X, b.Y, b.X + b.Width, b.Y + b.Height],
+                    width,
+                    height,
+                    angle,
+                );
                 words.push(Word {
                     text: word.Text()?.to_string(),
-                    rect: [b.X, b.Y, b.X + b.Width, b.Y + b.Height],
+                    rect: bounds,
                 });
                 rect = [
-                    rect[0].min(b.X),
-                    rect[1].min(b.Y),
-                    rect[2].max(b.X + b.Width),
-                    rect[3].max(b.Y + b.Height),
+                    rect[0].min(bounds[0]),
+                    rect[1].min(bounds[1]),
+                    rect[2].max(bounds[2]),
+                    rect[3].max(bounds[3]),
                 ];
             }
             if rect.iter().all(|v| v.is_finite()) && rect[2] > rect[0] && rect[3] > rect[1] {

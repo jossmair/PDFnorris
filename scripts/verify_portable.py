@@ -14,7 +14,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 version = tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))["package"]["version"]
 archive = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / f"dist/PDFnorris-{version}-portable-exe-windows-x64.zip"
-expected = {"PDFnorris/PDFnorris.exe": ROOT / "runtime/pdfnorris.exe",
+executable_source = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "runtime/pdfnorris.exe"
+expected = {"PDFnorris/PDFnorris.exe": executable_source,
             "PDFnorris/LICENCES.txt": ROOT / "licenses/LICENCES.txt"}
 sha = lambda data: hashlib.sha256(data).hexdigest()
 test_root = (ROOT / "test-output").resolve()
@@ -41,7 +42,7 @@ with zipfile.ZipFile(archive) as z:
 result = {"version": version, "archive": str(archive), "sha256": sha(archive.read_bytes()),
           "files": list(expected), "bytes": archive.stat().st_size,
           "crc_valid": True, "payload_matches": True, "extracted_x64_gui_exe": True,
-          "icon_verified": True, "executable_sha256": sha((ROOT / "runtime/pdfnorris.exe").read_bytes())}
+          "icon_verified": True, "executable_sha256": sha(executable_source.read_bytes())}
 (ROOT / f"portable-exe-verification-{version.replace('.', '')}.json").write_text(
     json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
 print(json.dumps(result, ensure_ascii=False, indent=2))

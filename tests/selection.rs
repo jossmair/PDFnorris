@@ -50,6 +50,39 @@ fn stream_page(streams: Vec<Stream>) -> Editor {
 }
 
 #[test]
+fn dense_vector_previews_and_deletions_do_not_pay_the_movement_replication_budget() {
+    let mut ops = String::new();
+    for n in 0..1500 {
+        let y = 10. + (n % 170) as f64;
+        ops.push_str(&format!("q 0.2 w 10 {y} m 190 {y} l S Q\n"));
+    }
+    let mut e = stream_page(vec![Stream::flate(Dict::new(), ops.as_bytes())]);
+    let before = e.bytes.clone();
+    let targets: Vec<_> = e
+        .selection_items(0)
+        .unwrap()
+        .into_iter()
+        .map(|i| i.target)
+        .collect();
+    assert_eq!(targets.len(), 1500);
+    assert!(
+        e.move_selection(0, &targets, [1., 1.])
+            .unwrap_err()
+            .contains("complexe")
+    );
+    assert_eq!(e.bytes, before);
+    let preview = e.selection_preview(0, &targets[..1], true, false).unwrap();
+    let preview = Editor::from_bytes((*preview).clone()).unwrap();
+    assert_eq!(preview.selection_items(0).unwrap().len(), 1);
+    assert_eq!(e.bytes, before);
+    assert!(!e.can_undo());
+    e.delete_selection(0, &targets).unwrap();
+    assert!(e.selection_items(0).unwrap().is_empty());
+    e.undo().unwrap();
+    assert_eq!(e.bytes, before);
+}
+
+#[test]
 fn selection_decode_budget_is_shared_between_all_page_streams() {
     let padding = vec![b' '; 8 * 1024 * 1024];
     let mut e = stream_page(vec![

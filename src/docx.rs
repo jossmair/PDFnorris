@@ -448,6 +448,9 @@ mod tests {
         let editor = Editor::open(std::path::Path::new(&path)).unwrap();
         let mut text = String::new();
         for n in 0..editor.info.pages.len() {
+            for paragraph in layout::paragraphs(&editor, n).unwrap() {
+                text.push_str(&format!("SOURCE {paragraph:?}\n"));
+            }
             let p = layout::page(&editor, n).unwrap();
             text.push_str(&format!(
                 "PAGE {n} {} {} {:?}\n",

@@ -1,5 +1,43 @@
 //! Independent document sessions for tabs; switching never discards unsaved work.
 use super::*;
+impl App {
+    pub(super) fn enforce_history_budget(&mut self, budget: usize) {
+        loop {
+            let editors = self.editor.iter().map(|e| (None, e)).chain(
+                self.documents
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, s)| s.as_ref()?.editor().map(|e| (Some(i), e))),
+            );
+            let mut total = 0usize;
+            let mut oldest = None;
+            for (tab, editor) in editors {
+                total = total.saturating_add(editor.history_bytes());
+                if let Some(age) = editor.oldest_history()
+                    && oldest.is_none_or(|(_, previous)| age < previous)
+                {
+                    oldest = Some((tab, age));
+                }
+            }
+            if total <= budget {
+                break;
+            }
+            let Some((tab, _)) = oldest else {
+                break;
+            };
+            let editor = if let Some(tab) = tab {
+                self.documents[tab]
+                    .as_mut()
+                    .and_then(DocumentState::editor_mut)
+            } else {
+                self.editor.as_mut()
+            };
+            if !editor.is_some_and(Editor::discard_oldest_history) {
+                break;
+            }
+        }
+    }
+}
 pub(super) struct DocumentState {
     panel_width: f32,
     properties_collapsed: bool,

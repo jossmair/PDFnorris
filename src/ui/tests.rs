@@ -1,4 +1,31 @@
 use super::*;
+#[test]
+fn history_budget_is_shared_by_active_and_inactive_tabs_without_changing_documents() {
+    let (_, mut app) = setup();
+    app.editor = None;
+    app.documents.clear();
+    let create = || {
+        let doc = pdfcraft_create::blank(200., 300., 1).unwrap();
+        let mut e =
+            Editor::from_bytes(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap())
+                .unwrap();
+        e.rotate_page(0, 90).unwrap();
+        e
+    };
+    app.insert_document(create());
+    let first = app.editor.as_ref().unwrap().bytes.clone();
+    app.insert_document(create());
+    let second = app.editor.as_ref().unwrap().bytes.clone();
+    let budget = app.editor.as_ref().unwrap().history_bytes();
+    app.enforce_history_budget(budget);
+    assert_eq!(app.active_document, 1);
+    assert_eq!(app.editor.as_ref().unwrap().bytes, second);
+    assert!(app.editor.as_ref().unwrap().can_undo());
+    app.activate_document(0);
+    assert_eq!(app.editor.as_ref().unwrap().bytes, first);
+    assert!(!app.editor.as_ref().unwrap().can_undo());
+    assert!(app.editor.as_ref().unwrap().dirty());
+}
 fn input_frame(ctx: &egui::Context, app: &mut App, events: Vec<egui::Event>) -> egui::FullOutput {
     let mut out = ctx.run_ui(
         egui::RawInput {

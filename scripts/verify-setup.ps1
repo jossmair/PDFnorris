@@ -1,6 +1,7 @@
-param([string]$Setup = '')
+param([string]$Setup = '', [string]$ExpectedExecutable = '')
 $ErrorActionPreference = 'Stop'
 $pdfRoot = Split-Path $PSScriptRoot
+if (-not $ExpectedExecutable) { $ExpectedExecutable = Join-Path $pdfRoot 'runtime/pdfnorris.exe' }
 $pdfVersion = [regex]::Match((Get-Content -LiteralPath (Join-Path $pdfRoot 'Cargo.toml') -Raw), '(?m)^version = "([^"]+)"').Groups[1].Value
 if (-not $Setup) { $Setup = Join-Path $pdfRoot "dist/PDFnorris-$pdfVersion-Setup.exe" }
 $pdfTestParent = [IO.Path]::GetFullPath((Join-Path $pdfRoot 'test-output'))
@@ -20,7 +21,7 @@ if ($pdfProcess.ExitCode -ne 0) { throw "Installation échouée : $($pdfProcess.
 $pdfInstalledExe = Join-Path $pdfTestDirectory 'PDFnorris.exe'
 $pdfInstalledLegal = Join-Path $pdfTestDirectory 'LICENCES.txt'
 foreach ($pdfPair in @(
-    @($pdfInstalledExe, (Join-Path $pdfRoot 'runtime/pdfnorris.exe')),
+    @($pdfInstalledExe, $ExpectedExecutable),
     @($pdfInstalledLegal, (Join-Path $pdfRoot 'licenses/LICENCES.txt'))
 )) {
     if ((Get-FileHash -LiteralPath $pdfPair[0] -Algorithm SHA256).Hash -ne

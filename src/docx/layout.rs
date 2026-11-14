@@ -173,7 +173,7 @@ pub(super) fn font(name: &str) -> String {
             .join(" ")
     }
 }
-fn paragraphs(e: &Editor, index: usize) -> Result<Vec<Paragraph>> {
+pub(super) fn paragraphs(e: &Editor, index: usize) -> Result<Vec<Paragraph>> {
     let page = &e.info.pages[index];
     let reading =
         pdfcraft_edit::reading_blocks_checked(&e.doc, index).map_err(|e| e.to_string())?;
@@ -523,6 +523,15 @@ fn split_rows(p: &Paragraph) -> Vec<Paragraph> {
 
 /// PDF runs commonly change font at a word or even a superscript. Reassemble
 /// one visual line before inferring columns, so styles do not create columns.
+fn script_token<'a>(runs: impl Iterator<Item = &'a Run>) -> bool {
+    let text: String = runs.map(|r| r.text.as_str()).collect();
+    let text = text.trim();
+    !text.is_empty()
+        && text.chars().count() <= 3
+        && text.chars().all(|c| {
+            c.is_alphanumeric() || matches!(c, '+' | '-' | '−' | '±' | '∓' | '°' | '′' | '″')
+        })
+}
 fn join_lines(mut input: Vec<Paragraph>, gap: f64) -> Vec<Paragraph> {
     input.sort_by(|a, b| {
         a.rect[1]
@@ -543,12 +552,7 @@ fn join_lines(mut input: Vec<Paragraph>, gap: f64) -> Vec<Paragraph> {
             let small = if size < row_size { &p } else { &row[0] };
             let script = size.min(row_size) <= size.max(row_size) * 0.8
                 && size.min(row_size) >= size.max(row_size) * 0.4
-                && small
-                    .runs
-                    .iter()
-                    .map(|r| r.text.chars().count())
-                    .sum::<usize>()
-                    <= 3
+                && script_token(small.runs.iter())
                 && ((bounds[1] + bounds[3] - p.rect[1] - p.rect[3]) / 2.).abs()
                     < size.max(row_size) * 1.2
                 && (p.rect[0] - bounds[2]).max(bounds[0] - p.rect[2]) < size.min(row_size) * 0.75;
@@ -570,7 +574,7 @@ fn join_lines(mut input: Vec<Paragraph>, gap: f64) -> Vec<Paragraph> {
             .flat_map(|p| &p.runs)
             .map(|r| r.text.chars().count())
             .sum::<usize>();
-        if count == 0 || count > 3 {
+        if count == 0 || count > 3 || !script_token(rows[i].iter().flat_map(|p| &p.runs)) {
             continue;
         }
         let Some(bounds) = rows[i].iter().map(|p| p.rect).reduce(union) else {
@@ -791,6 +795,39 @@ fn grid(lines: &[Line], paragraphs: &[Paragraph], fills: &[([f64; 4], [f64; 3])]
 
 /// Match both sides of a visible fraction bar before reading-order joining.
 /// Its numerator and denominator can belong to different PDF text objects.
+fn framed_edge(line: &Line, lines: &[Line]) -> bool {
+    let bar = line.rect();
+    let side_at = |x: f64, above: bool| {
+        lines.iter().any(|edge| {
+            let r = edge.rect();
+            edge.vertical()
+                && (edge.a[0] - x).abs() < 1.5
+                && r[1] <= bar[1] + 1.5
+                && r[3] >= bar[1] - 1.5
+                && if above {
+                    r[1] < bar[1] - 3.
+                } else {
+                    r[3] > bar[1] + 3.
+                }
+        })
+    };
+    !line.vertical()
+        && [true, false].into_iter().any(|above| {
+            side_at(bar[0], above)
+                && side_at(bar[2], above)
+                && lines.iter().any(|edge| {
+                    let r = edge.rect();
+                    !edge.vertical()
+                        && (r[0] - bar[0]).abs() < 1.5
+                        && (r[2] - bar[2]).abs() < 1.5
+                        && if above {
+                            r[1] < bar[1] - 3.
+                        } else {
+                            r[1] > bar[1] + 3.
+                        }
+                })
+        })
+}
 fn fractions(paragraphs: Vec<Paragraph>, lines: &[Line]) -> Vec<Paragraph> {
     let runs: Vec<_> = paragraphs
         .iter()
@@ -801,6 +838,12 @@ fn fractions(paragraphs: Vec<Paragraph>, lines: &[Line]) -> Vec<Paragraph> {
     for line in lines.iter().filter(|l| (l.a[1] - l.b[1]).abs() < 1.) {
         let bar = line.rect();
         if !(3. ..=100.).contains(&(bar[2] - bar[0])) {
+            continue;
+        }
+        // Numbered exercise labels often have a rectangular border. Its bottom
+        // edge is not a fraction bar, even when the following line starts with
+        // a digit. Both vertical sides identify the closed frame.
+        if framed_edge(line, lines) {
             continue;
         }
         let side = |above: bool| -> Vec<usize> {
@@ -941,9 +984,12 @@ fn fractions(paragraphs: Vec<Paragraph>, lines: &[Line]) -> Vec<Paragraph> {
     let bounds: Vec<_> = found.iter().map(|p| p.rect).collect();
     let mut math = found;
     output.retain(|p| {
-        let belongs = bounds
-            .iter()
-            .any(|b| p.rect[1] > b[1] + 2. && p.rect[3] < b[3] - 2.);
+        let belongs = bounds.iter().any(|b| {
+            p.rect[1] > b[1] + 2.
+                && p.rect[3] < b[3] - 2.
+                && p.rect[0] <= b[2] + 24.
+                && p.rect[2] >= b[0] - 24.
+        });
         if belongs {
             math.push(p.clone());
         }
@@ -1156,6 +1202,7 @@ pub(super) fn page(e: &Editor, index: usize) -> Result<Page> {
                     && r[0] <= bounds[0] + 2.
                     && r[2] >= bounds[2] - 2.
                     && r[2] - r[0] < paragraph.rect[2] - paragraph.rect[0] + 12.
+                    && !framed_edge(l, &lines)
             });
             if native_border {
                 run.underline = true;
@@ -1249,6 +1296,24 @@ pub(super) fn page(e: &Editor, index: usize) -> Result<Page> {
             continue;
         }
         if r[2] - r[0] <= 2. || r[3] - r[1] <= 2. {
+            let table_border = items.iter().any(|i| {
+                matches!(i,Item::Table(t)
+                if r[0]>=t.rect[0]-1. && r[1]>=t.rect[1]-1.
+                    && r[2]<=t.rect[2]+1. && r[3]<=t.rect[3]+1.)
+            });
+            let text_underline = r[3] - r[1] <= 2.
+                && paragraphs.iter().any(|p| {
+                    (r[1] - p.rect[3]).abs() < 3.
+                        && r[0] >= p.rect[0] - 3.
+                        && r[2] <= p.rect[2] + 12.
+                });
+            // Keep genuine page dividers and horizontal rules. They have no
+            // area to turn into a figure, but they still belong in the export.
+            // Do not add these narrow lines to decoration_regions: intersecting
+            // page rules could otherwise absorb unrelated illustrations.
+            if (r[2] - r[0]).max(r[3] - r[1]) > 40. && !table_border && !text_underline {
+                decoration_targets.push(item.target);
+            }
             continue;
         }
         if items.iter().any(|item| matches!(item, Item::Table(t) if contains(t.rect, [r[0], r[1]]) && contains(t.rect, [r[2], r[3]]))) { continue; }
@@ -1816,6 +1881,170 @@ mod fraction_tests {
                 fraction: None,
             }],
         }
+    }
+    #[test]
+    fn worksheet_framed_exercise_number_is_not_a_fraction() {
+        let lines = [
+            ([20., 20.], [40., 20.]),
+            ([20., 20.], [20., 44.]),
+            ([40., 20.], [40., 44.]),
+            ([20., 44.], [40., 44.]),
+        ]
+        .map(|(a, b)| Line {
+            a,
+            b,
+            width: 1.,
+            color: [0.; 3],
+        });
+        let result = fractions(
+            vec![
+                paragraph("10", [23., 23., 37., 41.]),
+                paragraph("6", [24., 48., 31., 60.]),
+            ],
+            &lines,
+        );
+        assert!(
+            result
+                .iter()
+                .flat_map(|p| &p.runs)
+                .all(|r| r.fraction.is_none())
+        );
+    }
+    #[test]
+    fn worksheet_cell_borders_do_not_add_underlining_to_native_values() {
+        use pdfcraft_cos::{Dict, Object, Stream};
+        let mut doc = pdfcraft_create::blank(100., 160., 1).unwrap();
+        let mut face = Dict::new();
+        face.set(b"Type".to_vec(), Object::name("Font"));
+        face.set(b"Subtype".to_vec(), Object::name("Type1"));
+        face.set(b"BaseFont".to_vec(), Object::name("Helvetica"));
+        let mut fonts = Dict::new();
+        fonts.set(b"F1".to_vec(), Object::Ref(doc.add(face)));
+        let mut resources = Dict::new();
+        resources.set(b"Font".to_vec(), Object::Dict(fonts));
+        let content=doc.add(Stream::flate(Dict::new(),b"20 100 20 24 re S 40 100 20 24 re S BT /F1 12 Tf 23 104 Td (10) Tj ET BT /F1 12 Tf 43 104 Td (20) Tj ET"));
+        let object = pdfcraft_model::pages(&doc)[0].obj;
+        doc.update_dict(object, |d| {
+            d.set(b"Resources".to_vec(), Object::Dict(resources));
+            d.set(b"Contents".to_vec(), Object::Ref(content));
+        })
+        .unwrap();
+        let editor =
+            Editor::from_bytes(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap())
+                .unwrap();
+        let output = page(&editor, 0).unwrap();
+        let runs: Vec<_> = output
+            .items
+            .iter()
+            .filter_map(|i| {
+                if let Item::Table(t) = i {
+                    Some(t)
+                } else {
+                    None
+                }
+            })
+            .flat_map(|t| &t.rows)
+            .flat_map(|row| row.iter())
+            .flat_map(|c| &c.paragraphs)
+            .flat_map(|p| &p.runs)
+            .collect();
+        assert_eq!(
+            runs.iter().map(|r| r.text.trim()).collect::<Vec<_>>(),
+            ["10", "20"]
+        );
+        assert!(runs.iter().all(|r| !r.underline));
+    }
+    #[test]
+    fn worksheet_page_rules_survive_without_flattening_native_paragraphs() {
+        use pdfcraft_cos::{Dict, Object, Stream};
+        let mut doc =
+            pdfcraft_create::from_text("Rule check", "Editable paragraph", (200., 200.), 12.)
+                .unwrap();
+        let object = pdfcraft_model::pages(&doc)[0].obj;
+        let original = doc
+            .get(object)
+            .as_dict()
+            .unwrap()
+            .get(b"Contents")
+            .unwrap()
+            .clone();
+        let rules = doc.add(Stream::flate(
+            Dict::new(),
+            b"0 G 0.8 w 100 20 m 100 170 l S 20 180 m 180 180 l S",
+        ));
+        doc.update_dict(object, |d| {
+            d.set(
+                b"Contents".to_vec(),
+                Object::Array(vec![original, Object::Ref(rules)]),
+            )
+        })
+        .unwrap();
+        let editor =
+            Editor::from_bytes(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap())
+                .unwrap();
+        let output = page(&editor, 0).unwrap();
+        let text: String = output
+            .items
+            .iter()
+            .filter_map(|i| {
+                if let Item::Paragraph(p) = i {
+                    Some(p)
+                } else {
+                    None
+                }
+            })
+            .flat_map(|p| &p.runs)
+            .map(|r| r.text.as_str())
+            .collect();
+        assert!(
+            text.chars()
+                .filter(|c| !c.is_whitespace())
+                .collect::<String>()
+                .contains("Editableparagraph"),
+            "{text:?}"
+        );
+        let decoration = output
+            .decorations
+            .iter()
+            .find(|p| p.rect == [0., 0., 200., 200.])
+            .unwrap();
+        let png = image::load_from_memory(&decoration.bytes)
+            .unwrap()
+            .into_rgba8();
+        let pixel = png.get_pixel(png.width() / 2, png.height() / 2);
+        assert!(
+            pixel[3] > 100 && pixel[0] < 100,
+            "The source divider must remain visible"
+        );
+    }
+    #[test]
+    fn worksheet_fraction_does_not_absorb_a_label_in_the_other_column() {
+        let result = fractions(
+            vec![
+                paragraph("1", [310., 30., 320., 42.]),
+                paragraph("2", [310., 50., 320., 62.]),
+                paragraph("1°)", [30., 44., 45., 55.]),
+            ],
+            &[Line {
+                a: [308., 45.],
+                b: [322., 45.],
+                width: 1.,
+                color: [0.; 3],
+            }],
+        );
+        assert!(
+            result
+                .iter()
+                .any(|p| p.runs.len() == 1 && p.runs[0].text == "1°)")
+        );
+    }
+    #[test]
+    fn worksheet_question_label_is_not_a_superscript_of_the_next_exercise() {
+        let mut small = paragraph("2°)", [30., 10., 45., 21.]);
+        small.runs[0].size = 11.;
+        let mut big = paragraph("9", [20., 22., 30., 42.]);
+        big.runs[0].size = 20.;
+        assert_eq!(join_lines(vec![small, big], 1.5).len(), 2);
     }
     fn sample(num: &str, diagonal: bool) -> Vec<Paragraph> {
         fractions(

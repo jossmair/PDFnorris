@@ -1,9 +1,9 @@
-param()
+param([string]$Executable = '')
 $ErrorActionPreference = 'Stop'
 $pdfRoot = Split-Path $PSScriptRoot
 $pdfManifest = Get-Content -LiteralPath (Join-Path $pdfRoot 'Cargo.toml') -Raw
 $pdfVersion = [regex]::Match($pdfManifest, '(?m)^version = "([^"]+)"').Groups[1].Value
-$pdfExecutable = Join-Path $pdfRoot 'runtime/pdfnorris.exe'
+$pdfExecutable = if ($Executable) { (Resolve-Path -LiteralPath $Executable).Path } else { Join-Path $pdfRoot 'runtime/pdfnorris.exe' }
 & python (Join-Path $PSScriptRoot 'generate_licenses.py') --check
 if ($LASTEXITCODE) { throw 'Les mentions légales ne correspondent pas à cette version.' }
 if ((Get-Item -LiteralPath $pdfExecutable).VersionInfo.ProductVersion -ne $pdfVersion) {

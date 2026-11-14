@@ -2,7 +2,7 @@
   <img src="assets/pdfnorris-logo.png" alt="PDFnorris — Aucun PDF ne lui résiste." width="420">
 </p>
 
-<h1 align="center">Vos PDF. À votre main.</h1>
+<h1 align="center">Vos PDF, à votre pied:</h1>
 
 <p align="center">
   Corrigez une phrase. Annotez un cours. Remettez vos pages dans le bon ordre.<br>
@@ -14,15 +14,15 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-Setup.exe"><img src="assets/telecharger-installateur.svg" alt="Installer PDFnorris V1.01 pour Windows" width="310"></a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.02/PDFnorris-1.0.2-Setup.exe"><img src="assets/telecharger-installateur.svg" alt="Installer PDFnorris V1.02 pour Windows" width="310"></a>
   &nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-portable-exe-windows-x64.zip"><img src="assets/telecharger-portable.svg" alt="Télécharger le ZIP portable V1.01" width="310"></a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.02/PDFnorris-1.0.2-portable-exe-windows-x64.zip"><img src="assets/telecharger-portable.svg" alt="Télécharger le ZIP portable V1.02" width="310"></a>
 </p>
 
 <p align="center">
-  <strong>V1.01</strong> &nbsp;·&nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/tag/v1.01">Les nouveautés</a> &nbsp;·&nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.01/SHA256SUMS.txt">Empreintes SHA-256</a> &nbsp;·&nbsp;
+  <strong>V1.02</strong> &nbsp;·&nbsp;
+  <a href="https://github.com/jossmair/PDFnorris/releases/tag/v1.02">Les nouveautés</a> &nbsp;·&nbsp;
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.02/SHA256SUMS.txt">Empreintes SHA-256</a> &nbsp;·&nbsp;
   <a href="#bien-démarrer">Bien démarrer</a>
 </p>
 
@@ -36,6 +36,14 @@ Police, taille, couleurs, alignement, puces et interligne : les réglages resten
 [![Modification d’un PDF dans la V1.01 : bloc de texte sélectionné et panneau de mise en forme](assets/screenshots/modifier-v101.png)](assets/screenshots/modifier-v101.png)
 
 <p align="center"><sub>Une vraie capture de PDFnorris V1.01. Cliquez sur les images pour les afficher en grand.</sub></p>
+
+## Une nouvelle famille d’icônes
+
+58 pictogrammes vectoriels orange et anthracite, avec des contours fins et des détails cuivrés. Ils restent nets à chaque échelle. La gouttière de défilement des miniatures apparaît uniquement lorsqu’elle est nécessaire.
+
+[![Les 58 icônes de PDFnorris V1.02, aperçu en 3840 pixels](assets/icons-4k.png)](assets/icons-4k.png)
+
+<sub>Planche de présentation haute définition. L’application utilise les fichiers SVG vectoriels.</sub>
 
 ## Trois modes. Le bon outil au bon moment.
 
@@ -86,7 +94,7 @@ Police, taille, couleurs, alignement, puces et interligne : les réglages resten
 
 | **Sur votre PC** | **À emporter** |
 | :--- | :--- |
-| [Téléchargez l’installeur Windows](https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-Setup.exe), puis suivez l’assistant. | [Téléchargez le ZIP portable](https://github.com/jossmair/PDFnorris/releases/download/v1.01/PDFnorris-1.0.1-portable-exe-windows-x64.zip), puis extrayez-le entièrement. |
+| [Téléchargez l’installeur Windows](https://github.com/jossmair/PDFnorris/releases/download/v1.02/PDFnorris-1.0.2-Setup.exe), puis suivez l’assistant. | [Téléchargez le ZIP portable](https://github.com/jossmair/PDFnorris/releases/download/v1.02/PDFnorris-1.0.2-portable-exe-windows-x64.zip), puis extrayez-le entièrement. |
 | Installation pour votre compte utilisateur. | Lancez **PDFnorris.exe** dans le dossier extrait et gardez **LICENCES.txt** à ses côtés. |
 
 **Windows 10 / 11, 64 bits.** Aucun compte ni abonnement n’est nécessaire.
@@ -101,7 +109,7 @@ L’OCR utilise les langues compatibles installées dans Windows.
 - La limite d’ouverture de cette version est de 256 Mio.
 - Le traitement du clic molette a été repris dans la V1.01. Le test physique avec la souris à l’origine du signalement reste à confirmer.
 
-[Notes de version](https://github.com/jossmair/PDFnorris/releases/tag/v1.01) · [Vérifications détaillées](VALIDATION.md)
+[Notes de version](https://github.com/jossmair/PDFnorris/releases/tag/v1.02) · [Vérifications détaillées](VALIDATION.md)
 
 </details>
 
@@ -112,7 +120,7 @@ Indiquez la version et les étapes à reproduire ; utilisez un exemple sans donn
 
 Le code Rust, les tests et les ressources sont disponibles dans ce dépôt.
 
-[Sources V1.01](https://github.com/jossmair/PDFnorris/tree/v1.01) · [Compiler le logiciel](BUILDING.md) · [Contribuer](CONTRIBUTING.md) · [Feuille de route](ROADMAP.md) · [Sécurité](SECURITY.md)
+[Sources V1.01](https://github.com/jossmair/PDFnorris/tree/v1.02) · [Compiler le logiciel](BUILDING.md) · [Contribuer](CONTRIBUTING.md) · [Feuille de route](ROADMAP.md) · [Sécurité](SECURITY.md)
 
 ---
 

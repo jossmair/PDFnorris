@@ -1,5 +1,16 @@
 # PDFnorris — notes de version
 
+## V1.02
+
+- OCR : rétablissement des coordonnées après le redressement Windows, conservation du texte clair sur fond sombre et nettoyage limité aux pixels des lettres.
+- OCR : les fragments isolés incertains dans les titres décoratifs conservent leurs pixels d’origine.
+- Miniatures : poignée de défilement plus fine, sans recouvrir les pages ; la gouttière disparaît lorsque toutes les miniatures tiennent dans le panneau.
+- Icônes : nouvelle famille de 58 pictogrammes vectoriels, recréée sur une grille commune, avec contours fins, surfaces anthracite et détails cuivrés.
+- Historique : budget de 512 Mio pour les tampons PDF des révisions, partagé entre les onglets, en complément des 100 étapes maximum par document. Les étapes les plus anciennes sont supprimées en premier ; le document courant reste intact. Ce budget ne limite pas la mémoire totale du logiciel.
+- Exports Office : les numéros encadrés, les libellés de questions et les bordures de cellules ne sont plus interprétés comme des fractions, des exposants ou des soulignements.
+- Exports Office : conservation des séparateurs de page et isolation des fractions entre colonnes.
+- Les aperçus de tracés denses et leur suppression conservent les limites de décodage de page, sans appliquer le budget de réplication réservé aux déplacements.
+
 ## V1.00
 
 Première version sous le nom PDFnorris, issue du code de PDFinator 1.0.10.

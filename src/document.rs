@@ -8,6 +8,9 @@ use std::{
 };
 
 pub type Result<T> = std::result::Result<T, String>;
+/// Serialized revisions retained for undo/redo, shared across all open tabs.
+/// This bounds PDF buffers, not the renderer, parsed-object cache or total RSS.
+pub const HISTORY_BYTE_BUDGET: usize = 512 * 1024 * 1024;
 fn ocr_view_rect(geometry: &pdfcraft_render::PageInfo, rect: [f64; 4]) -> [f32; 4] {
     let a = geometry.user_to_view(rect[0] as f32, rect[1] as f32);
     let b = geometry.user_to_view(rect[2] as f32, rect[3] as f32);
@@ -46,6 +49,7 @@ struct Snapshot {
     doc: Document,
     bytes: Arc<Vec<u8>>,
     revision: u64,
+    captured: u64,
 }
 
 pub struct Editor {
@@ -162,10 +166,51 @@ impl Editor {
         self.doc.permissions().is_none_or(|p| p.copy())
     }
     fn snapshot(&self) -> Snapshot {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         Snapshot {
             doc: self.doc.clone(),
             bytes: self.bytes.clone(),
             revision: self.revision,
+            captured: NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        }
+    }
+    /// Count distinct backing buffers once, even if several snapshots share one.
+    pub fn history_bytes(&self) -> usize {
+        let mut seen = std::collections::HashSet::new();
+        self.undo
+            .iter()
+            .chain(&self.redo)
+            .filter(|s| seen.insert(Arc::as_ptr(&s.bytes)))
+            .fold(0usize, |n, s| n.saturating_add(s.bytes.capacity()))
+    }
+    pub fn oldest_history(&self) -> Option<u64> {
+        self.undo
+            .first()
+            .into_iter()
+            .chain(self.redo.first())
+            .map(|s| s.captured)
+            .min()
+    }
+    /// Discard only the far end of a stack: every remaining step is contiguous.
+    pub fn discard_oldest_history(&mut self) -> bool {
+        let from_undo = match (self.undo.first(), self.redo.first()) {
+            (Some(a), Some(b)) => a.captured <= b.captured,
+            (Some(_), None) => true,
+            (None, Some(_)) => false,
+            _ => return false,
+        };
+        if from_undo {
+            self.undo.remove(0);
+        } else {
+            self.redo.remove(0);
+        }
+        true
+    }
+    fn trim_history(&mut self, budget: usize) {
+        while self.undo.len() + self.redo.len() > 100 || self.history_bytes() > budget {
+            if !self.discard_oldest_history() {
+                break;
+            }
         }
     }
     pub fn change(
@@ -209,10 +254,8 @@ impl Editor {
             Ok((doc, bytes, info))
         })?;
         self.undo.push(self.snapshot());
-        if self.undo.len() > 100 {
-            self.undo.remove(0);
-        }
         self.redo.clear();
+        self.trim_history(HISTORY_BYTE_BUDGET);
         self.doc = doc;
         self.bytes = bytes;
         self.info = info;
@@ -333,6 +376,7 @@ impl Editor {
         self.bytes = snapshot.bytes;
         self.revision = snapshot.revision;
         self.info = info;
+        self.trim_history(HISTORY_BYTE_BUDGET);
         Ok(())
     }
     pub fn save(&mut self, path: &Path) -> Result<()> {
@@ -1517,5 +1561,52 @@ impl SaveTask {
             }
             crate::files::atomic_write(&self.path, &self.bytes)
         })
+    }
+}
+
+#[cfg(test)]
+mod history_budget_tests {
+    use super::*;
+    fn editor() -> Editor {
+        let doc = pdfcraft_create::blank(200., 300., 1).unwrap();
+        Editor::from_bytes(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap()).unwrap()
+    }
+    #[test]
+    fn trimming_keeps_contiguous_undo_redo_and_exact_pdf_bytes() {
+        let mut e = editor();
+        let mut states = vec![e.bytes.clone()];
+        for _ in 0..3 {
+            e.rotate_page(0, 90).unwrap();
+            states.push(e.bytes.clone());
+        }
+        let budget = e.undo[1].bytes.capacity() + e.undo[2].bytes.capacity();
+        e.trim_history(budget);
+        assert_eq!(e.undo.len(), 2);
+        assert!(e.history_bytes() <= budget);
+        e.undo().unwrap();
+        assert_eq!(e.bytes, states[2]);
+        e.undo().unwrap();
+        assert_eq!(e.bytes, states[1]);
+        assert!(!e.can_undo());
+        e.redo().unwrap();
+        assert_eq!(e.bytes, states[2]);
+        e.redo().unwrap();
+        assert_eq!(e.bytes, states[3]);
+        assert!(e.dirty());
+        e.undo().unwrap();
+        e.rotate_page(0, 180).unwrap();
+        assert!(!e.can_redo());
+    }
+    #[test]
+    fn shared_revision_buffers_are_counted_once_and_zero_budget_preserves_current() {
+        let mut e = editor();
+        e.undo.push(e.snapshot());
+        e.undo.push(e.snapshot());
+        assert_eq!(e.history_bytes(), e.bytes.capacity());
+        let current = e.bytes.clone();
+        e.trim_history(0);
+        assert_eq!(e.history_bytes(), 0);
+        assert_eq!(e.bytes, current);
+        assert!(!e.dirty());
     }
 }

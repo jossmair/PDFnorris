@@ -2574,7 +2574,7 @@ dependencies = [
 
 [[package]]
 name = "pdfnorris"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "clipboard-win",
  "craft-print",

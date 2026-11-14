@@ -337,13 +337,17 @@ fn paints_change(
         return Ok(());
     }
     let all = inventory(doc, page)?;
-    if all
-        .paints
-        .iter()
-        .filter(|p| targets.contains(&p.id))
-        .map(|p| p.prefix + p.path.len())
-        .sum::<usize>()
-        > 2_000_000
+    // Only a move replays each paint's graphics-state prefix. A deletion
+    // (including an isolated export preview) replaces paint operators in place
+    // and remains bounded by the existing page-byte and operator budgets.
+    if delta.is_some()
+        && all
+            .paints
+            .iter()
+            .filter(|p| targets.contains(&p.id))
+            .map(|p| p.prefix + p.path.len())
+            .sum::<usize>()
+            > 2_000_000
     {
         return Err("Cette sélection est trop complexe. Déplacez-la en plusieurs parties.".into());
     }

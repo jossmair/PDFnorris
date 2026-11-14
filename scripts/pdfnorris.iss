@@ -2,10 +2,13 @@
 #ifndef AppVersion
   #error AppVersion must be supplied by package-setup.ps1
 #endif
+#ifndef AppExecutable
+  #define AppExecutable "..\runtime\pdfnorris.exe"
+#endif
 [Setup]
 AppId={{C37B4976-A267-4A3F-A19B-7BD916526746}
 AppName=PDFnorris
-AppVerName=PDFnorris V1.01
+AppVerName=PDFnorris {#AppVersion}
 AppVersion={#AppVersion}
 AppPublisher=Ergonatus
 AppCopyright=Ergonatus
@@ -39,7 +42,7 @@ Name: french; MessagesFile: compiler:Languages\French.isl
 Name: desktopicon; Description: Créer un raccourci sur le Bureau; Flags: unchecked; Check: not IsSmokeTest
 
 [Files]
-Source: ..\runtime\pdfnorris.exe; DestDir: {app}; DestName: PDFnorris.exe; Flags: ignoreversion
+Source: "{#AppExecutable}"; DestDir: {app}; DestName: PDFnorris.exe; Flags: ignoreversion
 Source: ..\licenses\LICENCES.txt; DestDir: {app}; Flags: ignoreversion
 
 [Icons]
