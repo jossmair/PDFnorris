@@ -1,5 +1,10 @@
 # PDFnorris — notes de version
 
+## V1.08 — aide et reprise des documents
+
+- Pictogrammes sur médaillons clairs, raccourcis illustrés et choix de taille orange.
+- Reprise volontaire des documents dans des cartes dédiées, avec noms de fichiers et actions explicites.
+
 ## V1.07 — aide et réglages
 
 - L’icône PDFnorris en haut à gauche ouvre l’aide ; F1 reste disponible.

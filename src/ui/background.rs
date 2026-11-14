@@ -478,14 +478,78 @@ impl App {
             let mut recover = None;
             egui::Modal::new(egui::Id::new("recovery")).show(ctx, |ui| {
                 ui.set_width((ctx.content_rect().width() - 80.).clamp(320., 560.));
-                ui.heading("Récupérer le travail interrompu");
-                ui.label("Des copies de travail sont disponibles après une fermeture inattendue.");
-                for (i, name) in entries.iter().enumerate() {
-                    if ui.button(format!("Récupérer {name}")).clicked() {
-                        recover = Some(i);
-                    }
-                }
-                if ui.button("Plus tard").clicked() {
+                egui::Frame::new()
+                    .fill(icons::RAIL)
+                    .corner_radius(10.)
+                    .inner_margin(14.)
+                    .show(ui, |ui| {
+                        ui.horizontal(|ui| {
+                            let (rect, _) =
+                                ui.allocate_exact_size(Vec2::splat(32.), egui::Sense::hover());
+                            icons::draw(ui.painter(), Icon::Page, rect, icons::ACCENT);
+                            ui.label(
+                                egui::RichText::new("Reprendre un document")
+                                    .size(20.)
+                                    .strong()
+                                    .color(Color32::WHITE),
+                            );
+                        });
+                    });
+                ui.add_space(10.);
+                ui.label("Vos copies de travail sont conservées sur cet ordinateur.");
+                ui.add_space(8.);
+                egui::ScrollArea::vertical()
+                    .max_height((ctx.content_rect().height() - 230.).max(40.))
+                    .show(ui, |ui| {
+                        for (i, name) in entries.iter().enumerate() {
+                            let display = std::path::Path::new(name)
+                                .file_name()
+                                .map(|n| n.to_string_lossy().into_owned())
+                                .unwrap_or_else(|| "Document PDF".into());
+                            egui::Frame::new()
+                                .fill(Color32::WHITE)
+                                .corner_radius(9.)
+                                .stroke(Stroke::new(1., Color32::from_rgb(224, 230, 238)))
+                                .inner_margin(12.)
+                                .show(ui, |ui| {
+                                    ui.horizontal_wrapped(|ui| {
+                                        let (rect, _) = ui.allocate_exact_size(
+                                            Vec2::splat(30.),
+                                            egui::Sense::hover(),
+                                        );
+                                        icons::draw(ui.painter(), Icon::Page, rect, icons::ACCENT);
+                                        ui.label(
+                                            egui::RichText::new(display).strong().color(icons::INK),
+                                        );
+                                        if ui
+                                            .add(
+                                                egui::Button::new(
+                                                    egui::RichText::new("Reprendre")
+                                                        .color(Color32::WHITE),
+                                                )
+                                                .fill(icons::ACCENT)
+                                                .corner_radius(7.)
+                                                .min_size(Vec2::new(90., 32.)),
+                                            )
+                                            .on_hover_text(format!("Reprendre {name}"))
+                                            .clicked()
+                                        {
+                                            recover = Some(i);
+                                        }
+                                    });
+                                });
+                            ui.add_space(7.);
+                        }
+                    });
+                ui.add_space(8.);
+                if ui
+                    .add(
+                        egui::Button::new("Fermer")
+                            .corner_radius(7.)
+                            .min_size(Vec2::new(80., 30.)),
+                    )
+                    .clicked()
+                {
                     self.work.show_recovery = false;
                 }
             });

@@ -5735,7 +5735,7 @@ fn recovery_is_available_only_when_requested_and_tab_closures_name_the_document(
     for _ in 0..3 {
         input_frame(&ctx, &mut app, vec![]);
     }
-    click_named_control(&ctx, &mut app, "Récupérer un brouillon interrompu…");
+    click_named_control(&ctx, &mut app, "Documents à reprendre →");
     assert!(app.work.show_recovery);
     assert!(!app.work.help_open);
     assert_eq!(app.editor.as_ref().unwrap().bytes, bytes);
@@ -5810,6 +5810,31 @@ fn brand_opens_help_and_close_preserves_the_document() {
         }],
     );
     assert!(app.work.help_open);
+}
+
+#[test]
+fn dismissing_document_resume_keeps_the_checkpoint_and_current_pdf() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    let original = app.editor.as_ref().unwrap().bytes.clone();
+    app.work.journal.entries.push(pdfnorris::recovery::Entry {
+        pdf: PathBuf::from("test-output/checkpoint-test.pdf"),
+        metadata: pdfnorris::recovery::Metadata {
+            name: "Exemple.pdf".into(),
+            draft: String::new(),
+            state: None,
+            checkpoint: None,
+        },
+    });
+    app.work.show_recovery = true;
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![]);
+    }
+    click_named_control(&ctx, &mut app, "Fermer");
+    assert!(!app.work.show_recovery);
+    assert_eq!(app.work.journal.entries.len(), 1);
+    assert!(app.work.opening.is_none());
+    assert_eq!(app.editor.as_ref().unwrap().bytes, original);
 }
 
 #[test]
