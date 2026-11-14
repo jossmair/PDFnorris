@@ -40,15 +40,16 @@ impl App {
                     let (logo, response) =
                         ui.allocate_exact_size(Vec2::new(25., 28.), egui::Sense::click_and_drag());
                     icons::draw(ui.painter(), Icon::Brand, logo.shrink(1.), Color32::WHITE);
-                    self.title_drag(
-                        &ctx,
-                        response.on_hover_text(format!(
-                            "{} {}\n{}\nUn logiciel de la suite Ergonatus",
-                            pdfnorris::APP_NAME,
-                            pdfnorris::DISPLAY_VERSION,
-                            pdfnorris::SLOGAN
-                        )),
-                    );
+                    response.widget_info(|| {
+                        egui::WidgetInfo::labeled(
+                            egui::WidgetType::Button,
+                            ui.is_enabled(),
+                            "Aide et réglages · F1",
+                        )
+                    });
+                    if response.on_hover_text("Aide et réglages · F1").clicked() {
+                        self.work.help_open = true;
+                    }
                     for (tab, label) in [
                         (Workspace::Read, "Lecture"),
                         (Workspace::Edit, "Modifier"),

@@ -1,5 +1,11 @@
 # PDFnorris — notes de version
 
+## V1.07 — aide et réglages
+
+- L’icône PDFnorris en haut à gauche ouvre l’aide ; F1 reste disponible.
+- En-tête anthracite, pictogrammes vectoriels orange, cartes par usage et raccourcis sous forme de touches.
+- Réglages de taille et récupération volontaire conservés.
+
 ## V1.06 — stabilisation et accessibilité
 
 - F1 : tailles d’interface Normale, Grande et Très grande, mémorisées localement.

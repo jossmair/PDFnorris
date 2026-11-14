@@ -5783,6 +5783,36 @@ fn help_close_control_stays_inside_compact_windows() {
 }
 
 #[test]
+fn brand_opens_help_and_close_preserves_the_document() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    let original = app.editor.as_ref().unwrap().bytes.clone();
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![]);
+    }
+    click_named_control(&ctx, &mut app, "Aide et réglages · F1");
+    assert!(app.work.help_open);
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![]);
+    }
+    click_named_control(&ctx, &mut app, "Fermer l’aide");
+    assert!(!app.work.help_open);
+    assert_eq!(app.editor.as_ref().unwrap().bytes, original);
+    input_frame(
+        &ctx,
+        &mut app,
+        vec![egui::Event::Key {
+            key: Key::F1,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }],
+    );
+    assert!(app.work.help_open);
+}
+
+#[test]
 fn background_page_import_keeps_tab_identity_and_cancels_a_ready_result() {
     let (ctx, mut app) = setup();
     let temp = tempfile::tempdir().unwrap();
