@@ -2096,6 +2096,14 @@ fn adding_pdf_files_from_pages_updates_thumbnails_and_can_be_undone() {
     }
     let before = app.editor.as_ref().unwrap().bytes.clone();
     app.append_pdf_paths(&paths);
+    for _ in 0..1000 {
+        input_frame(&ctx, &mut app, vec![]);
+        if app.work.importing.is_none() {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
+
     assert!(app.message.is_none(), "{:?}", app.message);
     assert_eq!(app.editor.as_ref().unwrap().info.pages.len(), 4);
     assert_eq!(app.page, 1);
@@ -5672,4 +5680,156 @@ fn fullscreen_vertical_slider_changes_only_the_view_and_retracts_after_drag() {
     );
     input_frame(&ctx, &mut app, vec![]);
     assert!(!app.fullscreen.zoom_visible);
+}
+
+#[test]
+fn interface_size_is_separate_from_pdf_zoom_and_preferences_are_saved_atomically() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    let temp = tempfile::tempdir().unwrap();
+    let path = temp.path().join("preferences/interface.json");
+    app.interface_preferences = Some(path.clone());
+    app.fit = Fit::Manual;
+    app.zoom = 0.8;
+    let bytes = app.editor.as_ref().unwrap().bytes.clone();
+    app.work.help_open = true;
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![]);
+    }
+    click_named_control(&ctx, &mut app, "Grande");
+    assert!(app.interface_size == accessibility::InterfaceSize::Large);
+    assert_eq!(app.zoom, 0.8);
+    assert_eq!(app.editor.as_ref().unwrap().bytes, bytes);
+    let stored: accessibility::InterfaceSize =
+        serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    assert!(stored == accessibility::InterfaceSize::Large);
+}
+
+#[test]
+fn recovery_is_available_only_when_requested_and_tab_closures_name_the_document() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    app.editor.as_mut().unwrap().path = Some(PathBuf::from("Exemple.pdf"));
+    let editor = app.editor.take().unwrap();
+    app.documents.clear();
+    app.insert_document(editor);
+    let bytes = app.editor.as_ref().unwrap().bytes.clone();
+    app.work.journal.entries.push(pdfnorris::recovery::Entry {
+        pdf: PathBuf::from("test-output/checkpoint-test.pdf"),
+        metadata: pdfnorris::recovery::Metadata {
+            name: "Exemple.pdf".into(),
+            draft: String::new(),
+            state: None,
+            checkpoint: None,
+        },
+    });
+    let out = input_frame(&ctx, &mut app, vec![]);
+    let nodes = &out.platform_output.accesskit_update.as_ref().unwrap().nodes;
+    assert!(
+        nodes
+            .iter()
+            .any(|(_, n)| n.label() == Some("Fermer Exemple.pdf"))
+    );
+    assert!(!app.work.show_recovery);
+    app.work.help_open = true;
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![]);
+    }
+    click_named_control(&ctx, &mut app, "Récupérer un brouillon interrompu…");
+    assert!(app.work.show_recovery);
+    assert!(!app.work.help_open);
+    assert_eq!(app.editor.as_ref().unwrap().bytes, bytes);
+}
+
+#[test]
+fn help_close_control_stays_inside_compact_windows() {
+    for size in [
+        Vec2::new(760., 540.),
+        Vec2::new(640., 360.),
+        Vec2::new(426., 240.),
+    ] {
+        let (ctx, mut app) = setup();
+        ctx.enable_accesskit();
+        app.work.help_open = true;
+        let mut last = None;
+        for _ in 0..4 {
+            let mut out = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+                    ..Default::default()
+                },
+                |ui| app.frame_ui(ui),
+            );
+            out.textures_delta.clear();
+            last = out.platform_output.accesskit_update;
+        }
+        let update = last.unwrap();
+        let bounds = update
+            .nodes
+            .iter()
+            .find(|(_, n)| n.label() == Some("Fermer l’aide"))
+            .expect("The close command must remain accessible")
+            .1
+            .bounds()
+            .unwrap();
+        assert!(
+            bounds.x0 >= 0.
+                && bounds.x1 <= f64::from(size.x)
+                && bounds.y0 >= 0.
+                && bounds.y1 <= f64::from(size.y),
+            "Close control outside {size:?}: {bounds:?}"
+        );
+    }
+}
+
+#[test]
+fn background_page_import_keeps_tab_identity_and_cancels_a_ready_result() {
+    let (ctx, mut app) = setup();
+    let temp = tempfile::tempdir().unwrap();
+    let source = temp.path().join("source.pdf");
+    let doc = pdfcraft_create::blank(200., 300., 2).unwrap();
+    let original_source = pdfcraft_cos::write_full(&doc, &Default::default()).unwrap();
+    std::fs::write(&source, &original_source).unwrap();
+    let original = app.editor.take().unwrap();
+    app.documents.clear();
+    app.insert_document(original);
+    let first = app.editor.as_ref().unwrap().bytes.clone();
+    app.insert_document(Editor::from_bytes(first.as_ref().clone()).unwrap());
+    let destination = app.editor.as_ref().unwrap().bytes.clone();
+    app.set_workspace(&ctx, Workspace::Pages);
+    for cancel in [true, false] {
+        app.append_pdf_paths(std::slice::from_ref(&source));
+        assert_eq!(app.editor.as_ref().unwrap().bytes, destination);
+        assert!(app.activate_document(0));
+        for _ in 0..1000 {
+            input_frame(&ctx, &mut app, vec![]);
+            if app.page_import_target().is_some() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        assert_eq!(app.page_import_target(), Some(1));
+        assert_eq!(app.editor.as_ref().unwrap().bytes, first);
+        assert!(app.activate_document(1));
+        if cancel {
+            app.cancel_page_import();
+        }
+        for _ in 0..1000 {
+            input_frame(&ctx, &mut app, vec![]);
+            if app.work.importing.is_none() {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(1));
+        }
+        assert!(app.work.importing.is_none());
+        if cancel {
+            assert_eq!(app.editor.as_ref().unwrap().bytes, destination);
+            assert!(!app.editor.as_ref().unwrap().can_undo());
+        } else {
+            assert_eq!(app.editor.as_ref().unwrap().info.pages.len(), 3);
+            app.undo_redo(false);
+            assert_eq!(app.editor.as_ref().unwrap().bytes, destination);
+        }
+    }
+    assert_eq!(std::fs::read(source).unwrap(), original_source);
 }

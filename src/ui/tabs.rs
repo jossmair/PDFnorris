@@ -126,9 +126,16 @@ impl App {
                                                         Color32::from_rgb(245, 65, 80),
                                                     );
                                                 }
-                                                if icons::small(ui, Icon::Close, "")
-                                                    .on_hover_text(format!("Fermer {label}"))
-                                                    .clicked()
+                                                if icons::button(
+                                                    ui,
+                                                    Icon::Close,
+                                                    &format!("Fermer {label}"),
+                                                    false,
+                                                    true,
+                                                    30.,
+                                                )
+                                                .on_hover_text(format!("Fermer {label}"))
+                                                .clicked()
                                                 {
                                                     close = Some(index);
                                                 }

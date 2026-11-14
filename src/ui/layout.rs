@@ -868,6 +868,7 @@ impl App {
             self.tabs(root);
         }
         self.work_status(root);
+        self.poll_page_import(&ctx);
         self.export_status(root);
         if !self.fullscreen.active {
             self.tools(root);

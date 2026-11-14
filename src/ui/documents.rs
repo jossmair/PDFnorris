@@ -394,6 +394,7 @@ impl App {
             }
             return;
         }
+        self.cancel_page_import();
         if self.word_export.is_some() || self.printing.busy || self.work.saving.is_some() {
             self.work.exit_after_jobs = true;
             return;

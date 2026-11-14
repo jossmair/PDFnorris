@@ -171,10 +171,15 @@ fn main() {
         "exercise" => exercise(path, out),
         "inspect" => {
             let e = Editor::open(path)?;
-            let lines = pdfcraft_edit::text_lines(&e.doc, 0).map_err(|e| e.to_string())?;
-            let blocks = e.blocks(0)?;
+            let page = args
+                .get(3)
+                .and_then(|s| s.to_str())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            let lines = pdfcraft_edit::text_lines(&e.doc, page).map_err(|e| e.to_string())?;
+            let blocks = e.blocks(page)?;
             Ok(
-                json!({"status":"ok","blocks":blocks.iter().map(|b|json!({"text":b.text,"editor_text":b.editor_text,"rect":b.rect,"spans":b.spans.iter().map(|(r,n)|json!({"range":[r.start,r.end],"line":n})).collect::<Vec<_>>()})).collect::<Vec<_>>(),"lines":lines.iter().map(|l|json!({"text":l.text,"font":l.font,"base_font":l.base_font})).collect::<Vec<_>>()}),
+                json!({"status":"ok","pages":e.info.pages.len(),"page":page,"blocks":blocks.iter().map(|b|json!({"text":b.text,"editor_text":b.editor_text,"rect":b.rect,"spans":b.spans.iter().map(|(r,n)|json!({"range":[r.start,r.end],"line":n})).collect::<Vec<_>>()})).collect::<Vec<_>>(),"lines":lines.iter().map(|l|json!({"text":l.text,"font":l.font,"base_font":l.base_font})).collect::<Vec<_>>()}),
             )
         }
         "ocr" => ocr(

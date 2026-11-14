@@ -567,11 +567,15 @@ fn delete_objects(doc: &mut Document, page: usize, targets: &[ObjectTarget]) -> 
     targets.sort();
     targets.dedup();
     targets.reverse();
+    let text: Vec<_> = targets
+        .iter()
+        .filter(|t| t.kind == ObjectKind::Text)
+        .map(|t| t.index)
+        .collect();
+    pdfcraft_edit::text::clear_blocks(doc, page, &text).map_err(|e| e.to_string())?;
     for t in targets {
         match t.kind {
-            ObjectKind::Text => {
-                pdfcraft_edit::text::clear_block(doc, page, t.index).map_err(|e| e.to_string())?
-            }
+            ObjectKind::Text => {}
             ObjectKind::Image => {
                 pdfcraft_edit::change_image(doc, page, t.index, &pdfcraft_edit::ImageChange::Delete)
                     .map_err(|e| e.to_string())?

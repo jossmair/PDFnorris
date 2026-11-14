@@ -458,3 +458,194 @@ fn native_background_stays_behind_text_and_added_circle_remains_editable_after_g
         "Editing the moved circle must not leave a duplicate"
     );
 }
+
+#[test]
+fn preview_can_remove_a_text_form_and_native_paragraphs_in_one_transaction() {
+    let mut doc = pdfcraft_create::blank(240., 240., 1).unwrap();
+    let mut font = Dict::new();
+    font.set(b"Type".to_vec(), Object::name("Font"));
+    font.set(b"Subtype".to_vec(), Object::name("Type1"));
+    font.set(b"BaseFont".to_vec(), Object::name("Helvetica"));
+    let mut fonts = Dict::new();
+    fonts.set(b"F1".to_vec(), Object::Ref(doc.add(Object::Dict(font))));
+    let mut resources = Dict::new();
+    resources.set(b"Font".to_vec(), Object::Dict(fonts));
+    let mut form = Dict::new();
+    form.set(b"Type".to_vec(), Object::name("XObject"));
+    form.set(b"Subtype".to_vec(), Object::name("Form"));
+    form.set(
+        b"BBox".to_vec(),
+        Object::Array([0, 0, 150, 100].into_iter().map(Object::Int).collect()),
+    );
+    form.set(b"Resources".to_vec(), Object::Dict(resources.clone()));
+    let form = doc.add(Stream::flate(
+        form,
+        b"BT /F1 12 Tf 10 50 Td (Inside form) Tj ET",
+    ));
+    let mut xobjects = Dict::new();
+    xobjects.set(b"Fm".to_vec(), Object::Ref(form));
+    resources.set(b"XObject".to_vec(), Object::Dict(xobjects));
+    let contents = doc.add(Stream::flate(Dict::new(), b"q 1 0 0 1 30 100 cm /Fm Do Q BT /F1 12 Tf 30 40 Td (Native paragraph) Tj ET 10 10 20 20 re S"));
+    let page = pdfcraft_model::pages(&doc)[0].obj;
+    doc.update_dict(page, |d| {
+        d.set(b"Resources".to_vec(), Object::Dict(resources));
+        d.set(b"Contents".to_vec(), Object::Ref(contents));
+    })
+    .unwrap();
+    let e =
+        Editor::from_bytes(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap()).unwrap();
+    let before = e.bytes.clone();
+    let paints: Vec<_> = e
+        .selection_items(0)
+        .unwrap()
+        .into_iter()
+        .filter(|i| matches!(i.target, Target::Paint(_)))
+        .map(|i| i.target)
+        .collect();
+    assert!(!paints.is_empty());
+    let preview = e.selection_preview(0, &paints, true, false).unwrap();
+    let after = Editor::from_bytes(preview.as_ref().clone()).unwrap();
+    assert!(after.text(0).unwrap().plain_text().trim().is_empty());
+    assert_eq!(e.bytes, before);
+}
+
+#[test]
+fn preview_uses_one_text_inventory_when_a_marked_scope_contains_several_paragraphs() {
+    let mut doc = pdfcraft_create::blank(240., 300., 1).unwrap();
+    let mut font = Dict::new();
+    font.set(b"Type".to_vec(), Object::name("Font"));
+    font.set(b"Subtype".to_vec(), Object::name("Type1"));
+    font.set(b"BaseFont".to_vec(), Object::name("Helvetica"));
+    let mut fonts = Dict::new();
+    fonts.set(b"F1".to_vec(), Object::Ref(doc.add(Object::Dict(font))));
+    let mut resources = Dict::new();
+    resources.set(b"Font".to_vec(), Object::Dict(fonts));
+    let stream = doc.add(Stream::flate(Dict::new(), b"/Span << /PNText true >> BDC BT /F1 12 Tf 30 260 Td (Upper paragraph) Tj ET BT /F1 12 Tf 30 30 Td (Lower paragraph) Tj ET EMC 10 10 15 15 re S"));
+    let page = pdfcraft_model::pages(&doc)[0].obj;
+    doc.update_dict(page, |d| {
+        d.set(b"Resources".to_vec(), Object::Dict(resources));
+        d.set(b"Contents".to_vec(), Object::Ref(stream));
+    })
+    .unwrap();
+    let e =
+        Editor::from_bytes(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap()).unwrap();
+    assert_eq!(e.blocks(0).unwrap().len(), 2);
+    let original = e.bytes.clone();
+    let selected: Vec<_> = e
+        .selection_items(0)
+        .unwrap()
+        .into_iter()
+        .filter(|i| matches!(i.target, Target::Paint(_)))
+        .map(|i| i.target)
+        .collect();
+    let preview = e.selection_preview(0, &selected, true, false).unwrap();
+    let result = Editor::from_bytes(preview.as_ref().clone()).unwrap();
+    assert!(result.text(0).unwrap().plain_text().trim().is_empty());
+    assert_eq!(e.bytes, original);
+}
+
+#[test]
+fn fragmented_overlapping_text_is_cleared_from_one_original_inventory() {
+    let mut doc = pdfcraft_create::blank(300., 200., 1).unwrap();
+    let mut font = Dict::new();
+    font.set(b"Type".to_vec(), Object::name("Font"));
+    font.set(b"Subtype".to_vec(), Object::name("Type1"));
+    font.set(b"BaseFont".to_vec(), Object::name("Helvetica"));
+    let mut fonts = Dict::new();
+    fonts.set(b"F1".to_vec(), Object::Ref(doc.add(Object::Dict(font))));
+    let mut resources = Dict::new();
+    resources.set(b"Font".to_vec(), Object::Dict(fonts));
+    let positions = [
+        (106, 100, 13),
+        (45, 120, 12),
+        (97, 120, 9),
+        (233, 80, 15),
+        (27, 100, 8),
+        (105, 120, 10),
+        (231, 120, 15),
+        (92, 80, 12),
+        (80, 120, 12),
+        (31, 80, 15),
+        (212, 100, 10),
+        (138, 100, 14),
+        (188, 100, 14),
+        (202, 100, 14),
+        (36, 80, 12),
+        (203, 80, 9),
+        (101, 100, 10),
+        (118, 100, 12),
+        (233, 80, 15),
+        (185, 80, 13),
+        (62, 100, 10),
+        (144, 120, 15),
+        (28, 80, 14),
+        (217, 100, 11),
+        (44, 100, 12),
+        (231, 80, 8),
+        (216, 120, 14),
+        (204, 100, 12),
+        (30, 120, 8),
+        (48, 80, 11),
+        (100, 100, 8),
+        (220, 100, 15),
+        (32, 80, 14),
+        (86, 80, 9),
+        (61, 100, 9),
+    ];
+    let mut ops = String::from("10 10 10 10 re S\n");
+    for (i, (x, y, size)) in positions.into_iter().enumerate() {
+        let text = if i % 7 == 0 {
+            "ALPHA".to_owned()
+        } else {
+            char::from(b'A' + (i % 5) as u8).to_string()
+        };
+        ops.push_str(&format!("BT /F1 {size} Tf {x} {y} Td ({text}) Tj ET\n"));
+    }
+    let stream = doc.add(Stream::flate(Dict::new(), ops.as_bytes()));
+    let page = pdfcraft_model::pages(&doc)[0].obj;
+    doc.update_dict(page, |d| {
+        d.set(b"Resources".to_vec(), Object::Dict(resources));
+        d.set(b"Contents".to_vec(), Object::Ref(stream));
+    })
+    .unwrap();
+    let mut e =
+        Editor::from_bytes(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap()).unwrap();
+    let original = e.bytes.clone();
+    for format in [pdfnorris::docx::Format::Docx, pdfnorris::docx::Format::Odt] {
+        let converted = pdfnorris::docx::convert_as(original.as_ref().clone(), format).unwrap();
+        assert!(converted.starts_with(b"PK"));
+        let name = if matches!(format, pdfnorris::docx::Format::Docx) {
+            "word/document.xml"
+        } else {
+            "content.xml"
+        };
+        assert!(
+            converted
+                .windows(name.len())
+                .any(|bytes| bytes == name.as_bytes())
+        );
+    }
+
+    let items = e.selection_items(0).unwrap();
+    let paints: Vec<_> = items
+        .iter()
+        .filter(|i| matches!(i.target, Target::Paint(_)))
+        .map(|i| i.target)
+        .collect();
+    let preview = e.selection_preview(0, &paints, true, false).unwrap();
+    let cleaned = Editor::from_bytes(preview.as_ref().clone()).unwrap();
+    assert!(cleaned.text(0).unwrap().plain_text().trim().is_empty());
+    assert!(!cleaned.selection_items(0).unwrap().is_empty());
+    assert_eq!(e.bytes, original);
+    let text: Vec<_> = items
+        .iter()
+        .filter(|i| matches!(i.target,Target::Object(o) if o.kind==pdfcraft_edit::ObjectKind::Text))
+        .map(|i| i.target)
+        .collect();
+    e.delete_selection(0, &text).unwrap();
+    assert!(e.text(0).unwrap().plain_text().trim().is_empty());
+    e.undo().unwrap();
+    assert_eq!(e.bytes, original);
+    e.redo().unwrap();
+    assert!(e.text(0).unwrap().plain_text().trim().is_empty());
+}

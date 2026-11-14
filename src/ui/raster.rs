@@ -124,11 +124,31 @@ impl Raster {
         if !self.pending.is_empty() {
             ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
-        // Keep a bounded set of full-resolution textures; thumbnails are much smaller.
-        if self.frames.len() > 12 {
+        self.trim_cache(visible, thumbs, 128 * 1024 * 1024, 16 * 1024 * 1024);
+    }
+    fn trim_cache(
+        &mut self,
+        visible: &[usize],
+        thumbs: &[usize],
+        page_budget: usize,
+        thumb_budget: usize,
+    ) {
+        let bytes = |texture: &egui::TextureHandle| {
+            let [width, height] = texture.size();
+            width.saturating_mul(height).saturating_mul(4)
+        };
+        let page_bytes = self
+            .frames
+            .values()
+            .fold(0usize, |n, f| n.saturating_add(bytes(&f.texture)));
+        if self.frames.len() > 12 || page_bytes > page_budget {
             self.frames.retain(|page, _| visible.contains(page));
         }
-        if self.thumbs.len() > 96 {
+        let thumb_bytes = self
+            .thumbs
+            .values()
+            .fold(0usize, |n, f| n.saturating_add(bytes(f)));
+        if self.thumbs.len() > 96 || thumb_bytes > thumb_budget {
             self.thumbs.retain(|page, _| thumbs.contains(page));
         }
     }
@@ -171,5 +191,35 @@ impl Background {
             ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
         None
+    }
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::*;
+    #[test]
+    fn byte_budget_evicts_large_offscreen_textures_below_the_count_limit() {
+        let ctx = egui::Context::default();
+        let mut raster = Raster::default();
+        for page in 0..3 {
+            let texture = ctx.load_texture(
+                format!("cache-test-{page}"),
+                egui::ColorImage::filled([8, 8], egui::Color32::WHITE),
+                Default::default(),
+            );
+            raster.frames.insert(
+                page,
+                Frame {
+                    texture: texture.clone(),
+                    scale: 1.,
+                    generation: 0,
+                },
+            );
+            raster.thumbs.insert(page, texture);
+        }
+        assert_eq!(raster.frames.len(), 3);
+        raster.trim_cache(&[1], &[2], 512, 512);
+        assert_eq!(raster.frames.keys().copied().collect::<Vec<_>>(), vec![1]);
+        assert_eq!(raster.thumbs.keys().copied().collect::<Vec<_>>(), vec![2]);
     }
 }
