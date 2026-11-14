@@ -45,6 +45,7 @@ impl App {
                                 .inner_margin(10.).show(ui, |ui| {
                                     ui.horizontal_top(|ui| {
                                         let (rect, _) = ui.allocate_exact_size(Vec2::splat(30.), egui::Sense::hover());
+                                        ui.painter().rect_filled(rect.expand(3.), 9., Color32::from_rgb(255, 238, 219));
                                         icons::draw(ui.painter(), icon, rect.shrink(2.), icons::ACCENT);
                                         ui.vertical(|ui| {
                                             ui.set_width((ui.available_width() - 4.).max(40.));
@@ -58,13 +59,22 @@ impl App {
                     }
                     ui.add_space(8.);
                     ui.horizontal_wrapped(|ui| {
-                        for (key, label) in [("Ctrl+O", "Ouvrir"), ("Ctrl+S", "Enregistrer"), ("Ctrl+F", "Rechercher"), ("Ctrl+Z", "Annuler"), ("Ctrl+Y", "Rétablir")] {
-                            ui.group(|ui| { ui.horizontal(|ui| { ui.monospace(key); ui.label(label); }); });
+                        for (icon, key, label) in [(Icon::Open, "Ctrl+O", "Ouvrir"), (Icon::Save, "Ctrl+S", "Enregistrer"), (Icon::Search, "Ctrl+F", "Rechercher"), (Icon::Undo, "Ctrl+Z", "Annuler"), (Icon::Redo, "Ctrl+Y", "Rétablir")] {
+                            ui.horizontal(|ui| {
+                                let (rect, _) = ui.allocate_exact_size(Vec2::splat(19.), egui::Sense::hover());
+                                icons::draw(ui.painter(), icon, rect, icons::ACCENT);
+                                ui.label(egui::RichText::new(label).size(12.).color(icons::INK));
+                                egui::Frame::new().fill(Color32::from_rgb(234, 239, 246))
+                                    .corner_radius(5.).inner_margin(egui::Margin::symmetric(7, 3))
+                                    .show(ui, |ui| { ui.label(egui::RichText::new(key).monospace().size(11.).color(icons::INK)); });
+                                ui.add_space(8.);
+                            });
                         }
                     });
                 });
+            ui.add_space(8.);
             self.interface_size_controls(ui);
-            if !self.work.journal.entries.is_empty() && ui.button("Récupérer un brouillon interrompu…").clicked() {
+            if !self.work.journal.entries.is_empty() && ui.add(egui::Button::new("Documents à reprendre →").fill(Color32::from_rgb(255, 239, 223)).corner_radius(8.).min_size(Vec2::new(0., 32.))).clicked() {
                 self.work.help_open = false;
                 self.work.show_recovery = true;
             }

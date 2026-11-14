@@ -41,7 +41,16 @@ impl InterfaceSize {
 impl App {
     pub(super) fn interface_size_controls(&mut self, ui: &mut egui::Ui) {
         ui.separator();
-        ui.label("Taille de l’interface");
+        ui.horizontal(|ui| {
+            let (rect, _) = ui.allocate_exact_size(Vec2::splat(22.), egui::Sense::hover());
+            icons::draw(ui.painter(), Icon::Text, rect, icons::ACCENT);
+            ui.label(
+                egui::RichText::new("Confort de lecture")
+                    .strong()
+                    .color(icons::INK),
+            );
+        });
+        ui.add_space(4.);
         let mut size = self.interface_size;
         ui.horizontal_wrapped(|ui| {
             for value in [
@@ -49,7 +58,23 @@ impl App {
                 InterfaceSize::Large,
                 InterfaceSize::ExtraLarge,
             ] {
-                ui.radio_value(&mut size, value, value.label());
+                let selected = size == value;
+                let button =
+                    egui::Button::new(egui::RichText::new(value.label()).color(if selected {
+                        Color32::WHITE
+                    } else {
+                        icons::INK
+                    }))
+                    .fill(if selected {
+                        icons::ACCENT
+                    } else {
+                        Color32::from_rgb(235, 239, 245)
+                    })
+                    .corner_radius(8.)
+                    .min_size(Vec2::new(84., 30.));
+                if ui.add(button).clicked() {
+                    size = value;
+                }
             }
         });
         if size != self.interface_size {
@@ -67,7 +92,6 @@ impl App {
                 }
             }
         }
-        ui.small("Ce réglage agrandit les commandes. Le zoom du PDF se règle séparément.");
     }
 }
 
