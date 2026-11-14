@@ -14,5 +14,5 @@ pub mod transfer;
 /// Public application identity, shared by the window and welcome screen.
 pub const APP_NAME: &str = "PDFnorris";
 pub const SLOGAN: &str = "Aucun PDF ne lui résiste.";
-pub const DISPLAY_VERSION: &str = "V1.06";
-pub const WINDOW_TITLE: &str = "PDFnorris V1.06 — Aucun PDF ne lui résiste.";
+pub const DISPLAY_VERSION: &str = "V1.07";
+pub const WINDOW_TITLE: &str = "PDFnorris V1.07 — Aucun PDF ne lui résiste.";

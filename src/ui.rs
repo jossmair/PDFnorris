@@ -12,6 +12,7 @@ mod drawing;
 mod drawing_style;
 mod export;
 mod fullscreen;
+mod help;
 mod inline;
 mod layout;
 mod marquee;

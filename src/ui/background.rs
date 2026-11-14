@@ -461,58 +461,7 @@ impl App {
         }
     }
     pub(super) fn recovery_dialog(&mut self, ctx: &egui::Context) {
-        if self.work.help_open {
-            let modal = egui::Modal::new(egui::Id::new("help")).show(ctx, |ui| {
-                ui.set_width((ctx.content_rect().width() - 32.).clamp(120., 560.));
-                ui.heading("Outils et raccourcis");
-                self.interface_size_controls(ui);
-                egui::ScrollArea::vertical().id_salt("help-details")
-                    .max_height((ctx.content_rect().height() - 240.).max(32.))
-                    .show(ui, |ui| {
-                for (name, description) in [
-                    (
-                        "Sélectionner",
-                        "Glissez un rectangle pour sélectionner plusieurs objets.",
-                    ),
-                    ("Main", "Glissez la page pour déplacer la vue."),
-                    (
-                        "Insérer du texte",
-                        "Glissez sur la page pour tracer le cadre, puis saisissez le texte.",
-                    ),
-                    (
-                        "Modifier le texte",
-                        "Cliquez un texte ; double-cliquez une image pour l’OCR.",
-                    ),
-                    ("Dessin", "Traits, formes et tableaux ; réglages à droite."),
-                    (
-                        "Pages",
-                        "Glissez vers un autre onglet, attendez son ouverture, puis déposez entre ses miniatures. Échap annule.",
-                    ),
-                    (
-                        "Ouvrir / Enregistrer / Rechercher",
-                        "Ctrl+O / Ctrl+S / Ctrl+F",
-                    ),
-                    ("Annuler / Rétablir", "Ctrl+Z / Ctrl+Y"),
-                ] {
-                    ui.strong(name);
-                    ui.label(description);
-                    ui.add_space(4.);
-                }
-                });
-                if !self.work.journal.entries.is_empty()
-                    && ui.button("Récupérer un brouillon interrompu…").clicked()
-                {
-                    self.work.help_open = false;
-                    self.work.show_recovery = true;
-                }
-                if ui.button("Fermer l’aide").clicked() {
-                    self.work.help_open = false;
-                }
-            });
-            if modal.should_close() {
-                self.work.help_open = false;
-            }
-        }
+        self.help_dialog(ctx);
         if self.work.show_recovery
             && !self.work.journal.entries.is_empty()
             && self.work.opening.is_none()
