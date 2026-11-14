@@ -1,5 +1,6 @@
 //! PDFnorris's document-first desktop workspace. The PDF engine remains UI-independent.
 #![allow(clippy::collapsible_if)]
+mod accessibility;
 mod background;
 mod canvas;
 mod clipboard;
@@ -15,6 +16,7 @@ mod inline;
 mod layout;
 mod marquee;
 mod middle;
+mod page_import;
 mod pages;
 mod printing;
 mod raster;
@@ -204,6 +206,8 @@ struct Drag {
     text_preview: Option<inline::Inline>,
 }
 pub struct App {
+    interface_size: accessibility::InterfaceSize,
+    interface_preferences: Option<PathBuf>,
     work: background::Work,
     editor: Option<Editor>,
     raster: raster::Raster,
@@ -263,11 +267,24 @@ pub struct App {
 }
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>, path: Option<PathBuf>) -> Self {
-        Self::from_context(&cc.egui_ctx, path)
+        let mut app = Self::from_context(&cc.egui_ctx, path);
+        app.interface_preferences = std::env::var_os("LOCALAPPDATA")
+            .map(|root| PathBuf::from(root).join("Ergonatus/PDFnorris/interface.json"));
+        if let Some(size) = app
+            .interface_preferences
+            .as_ref()
+            .and_then(|p| accessibility::load_preferences(p))
+        {
+            app.interface_size = size;
+            cc.egui_ctx.set_zoom_factor(app.interface_size.factor());
+        }
+        app
     }
     fn from_context(ctx: &egui::Context, path: Option<PathBuf>) -> Self {
         Self::configure(ctx);
         let mut app = Self {
+            interface_size: Default::default(),
+            interface_preferences: None,
             work: Default::default(),
             editor: None,
             raster: Default::default(),

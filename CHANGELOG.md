@@ -1,5 +1,17 @@
 # PDFnorris — notes de version
 
+## V1.06 — stabilisation et accessibilité
+
+- F1 : tailles d’interface Normale, Grande et Très grande, mémorisées localement.
+- F1 : explications défilantes et fermeture conservée dans les petites surfaces.
+- Reprise des brouillons à la demande, sans restauration ni dialogue au lancement.
+- Noms accessibles des croix d’onglets identifiant le document.
+- Budgets de rétention des textures hors écran en octets, en complément du nombre.
+- Lecture bornée des préférences, protocole NVDA/DPI et benchmark synthétique.
+
+- Correction des indices devenus obsolètes pendant la suppression de texte fragmenté et les aperçus Office.
+- Fusion de PDF en arrière-plan, annulable, avec validation de destination et rejet des résultats obsolètes.
+
 ## V1.05
 
 - Lecture plein écran avec une icône dédiée, le raccourci F11 et la main activée par défaut, y compris après un changement d’onglet.

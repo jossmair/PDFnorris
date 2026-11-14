@@ -399,7 +399,7 @@ impl App {
             self.page_drag = Some(page);
         }
     }
-    fn reset_page_views(&mut self, reset_raster: bool) {
+    pub(super) fn reset_page_views(&mut self, reset_raster: bool) {
         self.page_selection.replace([self.page]);
         self.selected = None;
         self.inline = None;
@@ -610,44 +610,7 @@ impl App {
         }
     }
     pub(super) fn append_pdf_paths(&mut self, paths: &[PathBuf]) {
-        if self.workspace != Workspace::Pages || !self.finish_text() || !self.permit() {
-            return;
-        }
-        let loaded: Result<Vec<_>> = paths
-            .iter()
-            .map(|path| {
-                pdfnorris::files::read(path).map(|bytes| {
-                    (
-                        path.file_name()
-                            .unwrap_or_default()
-                            .to_string_lossy()
-                            .into_owned(),
-                        bytes,
-                    )
-                })
-            })
-            .collect();
-        let result = loaded.and_then(|loaded| {
-            let sources: Vec<_> = loaded
-                .iter()
-                .map(|(name, bytes)| (name.as_str(), bytes.clone()))
-                .collect();
-            self.editor
-                .as_mut()
-                .ok_or("Aucun document ouvert.")?
-                .append_pdfs(&sources)
-        });
-        match result {
-            Ok(added) if added > 0 => {
-                self.page = self.editor.as_ref().unwrap().info.pages.len() - added;
-                self.page_destination = self.page + 1;
-                self.reset_page_views(true);
-                self.jump = Some(self.page);
-                self.message = None;
-            }
-            Ok(_) => {}
-            Err(error) => self.message = Some(error),
-        }
+        self.start_page_import(paths);
     }
     pub(super) fn pages_canvas(&mut self, root: &mut egui::Ui) {
         let ctx = root.ctx().clone();

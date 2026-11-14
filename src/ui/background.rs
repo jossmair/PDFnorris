@@ -16,6 +16,7 @@ pub(super) struct SearchJob {
     pub cancelled: Arc<std::sync::atomic::AtomicBool>,
 }
 pub(super) struct Work {
+    pub importing: Option<page_import::Job>,
     pub panel_width: f32,
     pub help_open: bool,
     pub discard_dialog: bool,
@@ -42,6 +43,7 @@ pub(super) struct Work {
 impl Default for Work {
     fn default() -> Self {
         Self {
+            importing: None,
             panel_width: 0.,
             help_open: false,
             discard_dialog: false,
@@ -461,8 +463,12 @@ impl App {
     pub(super) fn recovery_dialog(&mut self, ctx: &egui::Context) {
         if self.work.help_open {
             let modal = egui::Modal::new(egui::Id::new("help")).show(ctx, |ui| {
-                ui.set_width((ctx.content_rect().width() - 80.).clamp(320., 560.));
+                ui.set_width((ctx.content_rect().width() - 32.).clamp(120., 560.));
                 ui.heading("Outils et raccourcis");
+                self.interface_size_controls(ui);
+                egui::ScrollArea::vertical().id_salt("help-details")
+                    .max_height((ctx.content_rect().height() - 240.).max(32.))
+                    .show(ui, |ui| {
                 for (name, description) in [
                     (
                         "Sélectionner",
@@ -491,6 +497,13 @@ impl App {
                     ui.strong(name);
                     ui.label(description);
                     ui.add_space(4.);
+                }
+                });
+                if !self.work.journal.entries.is_empty()
+                    && ui.button("Récupérer un brouillon interrompu…").clicked()
+                {
+                    self.work.help_open = false;
+                    self.work.show_recovery = true;
                 }
                 if ui.button("Fermer l’aide").clicked() {
                     self.work.help_open = false;
@@ -566,6 +579,8 @@ impl App {
     pub(super) fn work_status(&mut self, root: &mut egui::Ui) {
         let status = if self.work.exit_after_jobs {
             Some("Fermeture après la fin des opérations…")
+        } else if self.work.importing.is_some() {
+            Some("Ajout de pages en cours ou prêt dans le PDF de destination…")
         } else if self.work.opening.is_some() || !self.work.paths.is_empty() {
             Some("Ouverture du PDF…")
         } else if self.work.saving.is_some() {
@@ -579,6 +594,15 @@ impl App {
                 ui.horizontal(|ui| {
                     ui.spinner();
                     ui.label(status);
+                    if let Some(index) = self.page_import_target()
+                        && ui.button("Afficher le PDF de destination").clicked()
+                    {
+                        self.activate_document(index);
+                    }
+                    if self.work.importing.is_some() && ui.button("Annuler l’ajout").clicked() {
+                        self.cancel_page_import();
+                    }
+
                     if self.work.exit_after_jobs && ui.button("Annuler la fermeture").clicked() {
                         self.work.exit_after_jobs = false;
                     }

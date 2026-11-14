@@ -1564,6 +1564,106 @@ impl SaveTask {
     }
 }
 
+/// Captures a destination without copying or parsing its PDF on the UI thread.
+pub struct PageImportRequest {
+    instance: u64,
+    base: Arc<Vec<u8>>,
+    signature_accepted: bool,
+}
+/// Validated worker result. Its source identity cannot be supplied by callers.
+pub struct PreparedPageImport {
+    request: PageImportRequest,
+    doc: Document,
+    bytes: Arc<Vec<u8>>,
+    info: DocInfo,
+    pages: std::ops::Range<usize>,
+}
+impl PageImportRequest {
+    pub fn prepare(
+        self,
+        sources: Vec<(String, Vec<u8>)>,
+        cancelled: &std::sync::atomic::AtomicBool,
+    ) -> Result<PreparedPageImport> {
+        use std::sync::atomic::Ordering;
+        guarded(|| {
+            if cancelled.load(Ordering::Acquire) {
+                return Err("Ajout annulé.".into());
+            }
+            let total = sources.iter().try_fold(0usize, |n, (_, b)| {
+                n.checked_add(b.len()).ok_or("Sources trop volumineuses.")
+            })?;
+            if total > 256 * 1024 * 1024 {
+                return Err("L’ensemble des PDF à ajouter dépasse 256 Mio. Ajoutez-les en plusieurs opérations.".into());
+            }
+            if sources.is_empty() {
+                return Err("Aucun PDF à ajouter.".into());
+            }
+            let mut editor = Editor::from_bytes(self.base.as_ref().clone())?;
+            editor.signature_accepted = self.signature_accepted;
+            let first = editor.info.pages.len();
+            let (names, contents): (Vec<_>, Vec<_>) = sources.into_iter().unzip();
+            let borrowed: Vec<_> = names
+                .iter()
+                .zip(contents)
+                .map(|(name, bytes)| (name.as_str(), bytes))
+                .collect();
+            if cancelled.load(Ordering::Acquire) {
+                return Err("Ajout annulé.".into());
+            }
+            let count = editor.append_pdfs(&borrowed)?;
+            if cancelled.load(Ordering::Acquire) {
+                return Err("Ajout annulé.".into());
+            }
+            Ok(PreparedPageImport {
+                request: self,
+                doc: editor.doc,
+                bytes: editor.bytes,
+                info: editor.info,
+                pages: first..first + count,
+            })
+        })
+    }
+}
+impl Editor {
+    pub fn page_import_request(&self) -> Result<PageImportRequest> {
+        if self.signed && !self.signature_accepted {
+            return Err("Confirmez d’abord la modification de ce PDF signé.".into());
+        }
+        if self.doc.permissions().is_some_and(|p| !p.modify()) {
+            return Err("Les permissions de ce PDF interdisent sa modification.".into());
+        }
+        Ok(PageImportRequest {
+            instance: self.instance,
+            base: self.bytes.clone(),
+            signature_accepted: self.signature_accepted,
+        })
+    }
+    pub fn apply_page_import(
+        &mut self,
+        prepared: PreparedPageImport,
+    ) -> Result<std::ops::Range<usize>> {
+        if self.instance != prepared.request.instance
+            || !Arc::ptr_eq(&self.bytes, &prepared.request.base)
+        {
+            return Err("Le document a changé pendant l’ajout. Les modifications actuelles sont conservées ; relancez l’ajout.".into());
+        }
+        self.page_import_request()?; // Recheck permissions and signature consent at commit time.
+        let next = self
+            .next_revision
+            .checked_add(1)
+            .ok_or("Historique saturé.")?;
+        self.undo.push(self.snapshot());
+        self.redo.clear();
+        self.trim_history(HISTORY_BYTE_BUDGET);
+        self.doc = prepared.doc;
+        self.bytes = prepared.bytes;
+        self.info = prepared.info;
+        self.revision = self.next_revision;
+        self.next_revision = next;
+        Ok(prepared.pages)
+    }
+}
+
 #[cfg(test)]
 mod history_budget_tests {
     use super::*;

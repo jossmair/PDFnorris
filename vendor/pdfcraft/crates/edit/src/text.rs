@@ -2045,12 +2045,28 @@ pub fn text_blocks(doc: &Document, page: usize) -> Result<Vec<TextBlock>, EditEr
 /// preserve the text matrix, so unselected text positioned relative to it stays in place.
 /// Call this on a clone: it is a preview operation, not a document edit.
 pub fn clear_block(doc: &mut Document, page: usize, block: usize) -> Result<(), EditError> {
+    clear_blocks(doc, page, &[block])
+}
+
+/// Clear several paragraphs using their original inventory. Removing a paragraph
+/// can regroup the remaining fragments, so resolving indexes between removals is
+/// incorrect. As with clear_block, operate on a clone for an editor preview.
+pub fn clear_blocks(doc: &mut Document, page: usize, selected: &[usize]) -> Result<(), EditError> {
+    if selected.is_empty() {
+        return Ok(());
+    }
+    if selected.len() > 10_000 {
+        return Err(EditError::Invalid("too many paragraphs selected for one preview".into()));
+    }
     let lines = text_lines(doc, page)?;
     let blocks = group_blocks(doc, &lines);
-    let target = blocks.get(block).ok_or_else(|| EditError::Invalid("the paragraph no longer exists".into()))?;
-    let targets: Vec<&TextLine> = target.lines.iter().filter_map(|i| lines.get(*i)).collect();
+    let mut targets = Vec::new();
+    for index in selected.iter().copied().collect::<std::collections::BTreeSet<_>>() {
+        let block = blocks.get(index).ok_or_else(|| EditError::Invalid("the paragraph no longer exists".into()))?;
+        targets.extend(block.lines.iter().filter_map(|i| lines.get(*i)));
+    }
     let mut drops = coincident_ops(&lines, &targets);
-    drops.extend(target.lines.iter().filter_map(|i| lines.get(*i)).flat_map(|l| l.ops.iter().copied()));
+    drops.extend(targets.iter().flat_map(|l| l.ops.iter().copied()));
     let p = page_dict(doc, page)?;
     let res = p.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();
     let fonts = res.get(b"Font").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();
@@ -2058,34 +2074,49 @@ pub fn clear_block(doc: &mut Document, page: usize, block: usize) -> Result<(), 
     let pieces = Pieces::join(&streams.iter().map(|(_, d)| d.as_slice()).collect::<Vec<_>>());
     let ops = pieces.parse().ops;
     let shown = interpret(doc, &ops, &fonts, &mut HashMap::new(), &mut Carry::new(), None, None);
-    if let Some(scope) = targets
-        .first()
-        .and_then(|l| l.scope)
-        .filter(|i| ops.get(*i).and_then(|o| o.operands.get(1)).and_then(Object::as_dict).is_some_and(|d| d.get(b"PNText").is_some()))
-    {
-        let mut depth = 0_usize;
-        let mut stop = None;
-        for (index, op) in ops.iter().enumerate().skip(scope) {
+    let selected_scopes: std::collections::BTreeSet<_> = targets
+        .iter()
+        .filter_map(|line| line.scope)
+        .filter(|index| ops.get(*index).and_then(|o| o.operands.get(1)).and_then(Object::as_dict).is_some_and(|d| d.get(b"PNText").is_some()))
+        .collect();
+    let mut ranges: Vec<(usize, usize)> = Vec::new();
+    if !selected_scopes.is_empty() {
+        let mut stack = Vec::new();
+        for (index, op) in ops.iter().enumerate() {
             if op.is("BMC") || op.is("BDC") {
-                depth = depth.saturating_add(1);
-            }
-            if op.is("EMC") {
-                depth = depth.saturating_sub(1);
-                if depth == 0 {
-                    stop = Some(index);
-                    break;
+                if stack.len() >= 1024 {
+                    return Err(EditError::Invalid("marked text nesting is too deep for a preview".into()));
                 }
+                stack.push(index);
+            } else if op.is("EMC")
+                && let Some(start) = stack.pop()
+                && selected_scopes.contains(&start)
+            {
+                ranges.push((start, index));
             }
         }
-        if let Some(stop) = stop {
-            let data = splice(&pieces, &ops, |i| (Vec::new(), !(scope..=stop).contains(&i)));
-            let contents = rewritten_contents(doc, &streams, data);
-            doc.update_dict(p.obj, |d| d.set(b"Contents".to_vec(), contents))?;
-            return Ok(());
+        if stack.iter().any(|index| selected_scopes.contains(index)) {
+            return Err(EditError::Invalid("a selected marked text scope is unterminated".into()));
         }
+        ranges.sort_unstable();
+        let mut merged: Vec<(usize, usize)> = Vec::new();
+        for (start, end) in ranges {
+            if let Some(last) = merged.last_mut()
+                && start <= last.1
+            {
+                last.1 = last.1.max(end);
+            } else {
+                merged.push((start, end));
+            }
+        }
+        ranges = merged;
     }
+    let in_scope = |index: usize| {
+        let next = ranges.partition_point(|range| range.1 < index);
+        ranges.get(next).is_some_and(|range| range.0 <= index)
+    };
     let mut patches = HashMap::new();
-    for s in shown.into_iter().filter(|s| drops.contains(&s.op)) {
+    for s in shown.into_iter().filter(|s| drops.contains(&s.op) && !in_scope(s.op)) {
         if s.state.render_mode >= 4 {
             return Err(EditError::Invalid("text used as a clipping path cannot be previewed for editing".into()));
         }
@@ -2107,7 +2138,8 @@ pub fn clear_block(doc: &mut Document, page: usize, block: usize) -> Result<(), 
         replacement.push(Op::new("TJ", vec![Object::Array(vec![pdfcraft_content::num(adjustment)])]));
         patches.insert(s.op, replacement);
     }
-    let data = splice(&pieces, &ops, |i| patches.remove(&i).map_or((Vec::new(), true), |v| (v, false)));
+    let data =
+        splice(&pieces, &ops, |i| if in_scope(i) { (Vec::new(), false) } else { patches.remove(&i).map_or((Vec::new(), true), |v| (v, false)) });
     let contents = rewritten_contents(doc, &streams, data);
     doc.update_dict(p.obj, |d| d.set(b"Contents".to_vec(), contents))?;
     Ok(())
