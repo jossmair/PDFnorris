@@ -1,5 +1,11 @@
 # PDFnorris — notes de version
 
+## V1.09 — aide claire et compacte
+
+- Fond et en-tête blancs, titre foncé et commande illustrée pour reprendre un document.
+- Hauteur réduite et défilement intérieur pour conserver des marges autour de l’aide.
+- Test des marges sur des surfaces de 720 et 1080 pixels de haut.
+
 ## V1.08 — aide et reprise des documents
 
 - Pictogrammes sur médaillons clairs, raccourcis illustrés et choix de taille orange.

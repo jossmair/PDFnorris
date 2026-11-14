@@ -5735,7 +5735,7 @@ fn recovery_is_available_only_when_requested_and_tab_closures_name_the_document(
     for _ in 0..3 {
         input_frame(&ctx, &mut app, vec![]);
     }
-    click_named_control(&ctx, &mut app, "Documents à reprendre →");
+    click_named_control(&ctx, &mut app, "Reprendre un document");
     assert!(app.work.show_recovery);
     assert!(!app.work.help_open);
     assert_eq!(app.editor.as_ref().unwrap().bytes, bytes);
@@ -5835,6 +5835,51 @@ fn dismissing_document_resume_keeps_the_checkpoint_and_current_pdf() {
     assert_eq!(app.work.journal.entries.len(), 1);
     assert!(app.work.opening.is_none());
     assert_eq!(app.editor.as_ref().unwrap().bytes, original);
+}
+
+#[test]
+fn help_header_and_resume_action_keep_vertical_margins() {
+    for size in [Vec2::new(1280., 720.), Vec2::new(1920., 1080.)] {
+        let (ctx, mut app) = setup();
+        ctx.enable_accesskit();
+        app.work.help_open = true;
+        app.work.journal.entries.push(pdfnorris::recovery::Entry {
+            pdf: PathBuf::from("test-output/checkpoint-test.pdf"),
+            metadata: pdfnorris::recovery::Metadata {
+                name: "Exemple.pdf".into(),
+                draft: String::new(),
+                state: None,
+                checkpoint: None,
+            },
+        });
+        let mut update = None;
+        for _ in 0..4 {
+            let mut out = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+                    ..Default::default()
+                },
+                |ui| app.frame_ui(ui),
+            );
+            out.textures_delta.clear();
+            update = out.platform_output.accesskit_update;
+        }
+        let update = update.unwrap();
+        for label in ["Fermer l’aide", "Reprendre un document"] {
+            let bounds = update
+                .nodes
+                .iter()
+                .find(|(_, n)| n.label() == Some(label))
+                .expect("Help controls must remain available")
+                .1
+                .bounds()
+                .unwrap();
+            assert!(
+                bounds.y0 >= 24. && bounds.y1 <= f64::from(size.y) - 24.,
+                "{label}: {bounds:?}"
+            );
+        }
+    }
 }
 
 #[test]

@@ -5,15 +5,17 @@ impl App {
         if !self.work.help_open {
             return;
         }
-        let modal = egui::Modal::new(egui::Id::new("help")).show(ctx, |ui| {
+        let modal = egui::Modal::new(egui::Id::new("help"))
+            .frame(egui::Frame::new().fill(Color32::WHITE).corner_radius(16.).inner_margin(16.))
+            .show(ctx, |ui| {
             ui.set_width((ctx.content_rect().width() - 40.).clamp(120., 680.));
-            egui::Frame::new().fill(icons::RAIL).corner_radius(12.).inner_margin(16.).show(ui, |ui| {
+            egui::Frame::new().fill(Color32::WHITE).corner_radius(12.).inner_margin(16.).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     let (rect, _) = ui.allocate_exact_size(Vec2::splat(40.), egui::Sense::hover());
                     icons::draw(ui.painter(), Icon::Brand, rect, Color32::WHITE);
                     ui.vertical(|ui| {
-                        ui.label(egui::RichText::new("PDFnorris").size(23.).strong().color(Color32::WHITE));
-                        ui.label(egui::RichText::new("Les bons gestes, à portée de main.").color(Color32::from_rgb(206, 215, 228)));
+                        ui.label(egui::RichText::new("PDFnorris").size(23.).strong().color(icons::INK));
+                        ui.label(egui::RichText::new("Les bons gestes, à portée de main.").color(Color32::from_rgb(96, 109, 127)));
                     });
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if icons::button(ui, Icon::Close, "Fermer l’aide", false, true, 32.).clicked() { self.work.help_open = false; }
@@ -22,7 +24,7 @@ impl App {
             });
             ui.add_space(10.);
             egui::ScrollArea::vertical().id_salt("help-details")
-                .max_height((ctx.content_rect().height() - 240.).max(40.))
+                .max_height(((ctx.content_rect().height() - 64.).min(600.) - 240.).max(1.))
                 .show(ui, |ui| {
                     for (title, items) in [
                         ("MODIFIER VOTRE DOCUMENT", vec![
@@ -74,9 +76,20 @@ impl App {
                 });
             ui.add_space(8.);
             self.interface_size_controls(ui);
-            if !self.work.journal.entries.is_empty() && ui.add(egui::Button::new("Documents à reprendre →").fill(Color32::from_rgb(255, 239, 223)).corner_radius(8.).min_size(Vec2::new(0., 32.))).clicked() {
-                self.work.help_open = false;
-                self.work.show_recovery = true;
+            if !self.work.journal.entries.is_empty() {
+                ui.add_space(10.);
+                let (rect, response) = ui.allocate_exact_size(Vec2::new(ui.available_width().min(260.), 44.), egui::Sense::click());
+                response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, ui.is_enabled(), "Reprendre un document"));
+                let fill = if response.hovered() || response.has_focus() { Color32::from_rgb(255, 237, 215) } else { Color32::from_rgb(255, 247, 237) };
+                ui.painter().rect_filled(rect, 10., fill);
+                ui.painter().rect_stroke(rect, 10., Stroke::new(1., Color32::from_rgb(237, 185, 139)), egui::StrokeKind::Inside);
+                icons::draw(ui.painter(), Icon::Undo, Rect::from_min_size(rect.min + Vec2::new(12., 10.), Vec2::splat(24.)), icons::ACCENT);
+                ui.painter().text(rect.min + Vec2::new(46., 22.), egui::Align2::LEFT_CENTER, "Reprendre un document", egui::FontId::proportional(13.), icons::INK);
+                icons::draw(ui.painter(), Icon::Next, Rect::from_min_size(Pos2::new(rect.right()-28., rect.top()+13.), Vec2::splat(18.)), icons::ACCENT);
+                if response.clicked() {
+                    self.work.help_open = false;
+                    self.work.show_recovery = true;
+                }
             }
         });
         if modal.should_close() {
