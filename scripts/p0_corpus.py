@@ -48,12 +48,17 @@ def memory_job():
     return handle  # Keep it for this process and its children.
 
 
+class StructuralDifference(Exception):
+    """A measured invariant changed in documents that the reader could open."""
+
+
 def compare(source, result, record):
     import numpy as np
     import pypdfium2 as pdfium
     from pypdf import PdfReader
     a, b = PdfReader(source, strict=True), PdfReader(result, strict=True)
-    assert len(a.pages) == len(b.pages), "page_count"
+    if len(a.pages) != len(b.pages):
+        raise StructuralDifference("page_count")
     # Text edits must leave page dictionaries (except content/resources) and
     # document navigation/interactive structures semantically unchanged.
     def plain(value, seen=None):
@@ -70,17 +75,23 @@ def compare(source, result, record):
             return {str(k): plain(v, seen) for k, v in value.items() if str(k) not in {"/Parent", "/P", "/Length"}}
         if isinstance(value, list):
             return [plain(x, seen) for x in value]
+        if isinstance(value, (int, float)):
+            # PDF integer and real spellings (notably 0 and 0.0) can be equal.
+            return ("number", value)
         return str(value)
     for left, right in zip(a.pages, b.pages):
         for key in ["/MediaBox", "/CropBox", "/Rotate", "/UserUnit", "/Annots"]:
-            assert plain(left.get(key)) == plain(right.get(key)), "page_structure"
+            if plain(left.get(key)) != plain(right.get(key)):
+                raise StructuralDifference(key)
     for key in ["/Outlines", "/Names", "/AcroForm", "/Metadata"]:
-        assert plain(a.trailer["/Root"].get(key)) == plain(b.trailer["/Root"].get(key)), "catalogue_structure"
+        if plain(a.trailer["/Root"].get(key)) != plain(b.trailer["/Root"].get(key)):
+            raise StructuralDifference(key)
     pixels = changed = geometric = inside = 0
     with pdfium.PdfDocument(source) as old, pdfium.PdfDocument(result) as new:
         for index in range(len(old)):
             p, q = old[index], new[index]
-            assert p.get_size() == q.get_size(), "page_size"
+            if p.get_size() != q.get_size():
+                raise StructuralDifference("page_size")
             scale = min(1.5, 1400 / max(p.get_size()))
             bitmap1, bitmap2 = p.render(scale=scale), q.render(scale=scale)
             image1, image2 = bitmap1.to_numpy(), bitmap2.to_numpy()
@@ -148,6 +159,8 @@ def main():
         source, result, record = args.compare
         try:
             print(json.dumps(compare(source, result, json.loads(Path(record).read_text(encoding="utf8")))))
+        except StructuralDifference as exc:
+            print(json.dumps({"status": "unexpected_difference", "structure": str(exc)}))
         except Exception as exc:
             print(json.dumps({"status": "oracle_error", "category": type(exc).__name__}))
         return

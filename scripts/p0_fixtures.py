@@ -28,7 +28,7 @@ def main():
     pdfmetrics.registerFont(TTFont("InterFixture", str(root/"vendor/pdfcraft/assets/fonts/Inter-Regular.ttf")))
     a.output.mkdir(parents=True, exist_ok=False)
     descriptions = [
-        "Standard font", "Fragmented text operators", "Text split across streams",
+        "Standard font and real-valued page origin", "Fragmented text operators", "Text split across streams",
         "Individually positioned characters", "Offset fake bold", "Accents and ligatures",
         "Indices superscripts and fractions", "Embedded subset font", "Mixed fonts",
         "Rotated text and transform", "Text in Form XObject", "Nested Form XObjects",
@@ -98,6 +98,9 @@ def main():
         reader=PdfReader(buf); writer=PdfWriter(); writer.clone_document_from_reader(reader)
         page=writer.pages[0]
         expected="ok"
+        if letter == "A":
+            from pypdf.generic import FloatObject
+            page.mediabox[0] = FloatObject(0)
         if letter == "C":
             data=page.get_contents().get_data(); cut=data.index(b"(TARGET)")
             refs=[]
