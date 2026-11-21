@@ -18,6 +18,27 @@ fn contains(r: [f64; 4], p: [f64; 2]) -> bool {
 fn center(r: [f64; 4]) -> [f64; 2] {
     [(r[0] + r[2]) / 2., (r[1] + r[3]) / 2.]
 }
+/// Captions belong to the illustration they touch, including its original padding.
+/// A previous caption's bounds must not enlarge this membership test.
+fn is_figure_label(area: [f64; 4], p: &Paragraph, artwork: &[[f64; 4]]) -> bool {
+    if !contains(area, center(p.rect))
+        && !(touches(area, p.rect)
+            && p.runs.iter().map(|r| r.text.chars().count()).sum::<usize>() <= 30)
+    {
+        return false;
+    }
+    // A group of disconnected vector marks can surround a line of ordinary
+    // prose. Its bounding box alone is insufficient evidence of a caption.
+    let prose = p
+        .runs
+        .iter()
+        .flat_map(|r| r.text.split_whitespace())
+        .filter(|s| s.chars().filter(|c| c.is_alphabetic()).count() >= 2)
+        .take(3)
+        .count()
+        == 3;
+    !prose || artwork.iter().any(|r| touches(*r, p.rect))
+}
 fn edges(mut values: Vec<f64>) -> Vec<f64> {
     values.sort_by(f64::total_cmp);
     values.dedup_by(|a, b| (*a - *b).abs() < 1.5);
@@ -1463,18 +1484,14 @@ pub(super) fn page(e: &Editor, index: usize) -> Result<Page> {
                     }
                 }
             }
-            for paragraph in &paragraphs {
-                if contains(r, center(paragraph.rect))
-                    || (touches(r, paragraph.rect)
-                        && paragraph
-                            .runs
-                            .iter()
-                            .map(|r| r.text.chars().count())
-                            .sum::<usize>()
-                            <= 30)
-                {
-                    r = union(r, paragraph.rect);
-                }
+            // Decide membership against the original crop. A caption can enlarge
+            // it but must not recruit the next line, then the next paragraph.
+            let label_area = r;
+            for paragraph in paragraphs
+                .iter()
+                .filter(|p| is_figure_label(label_area, p, &artwork))
+            {
+                r = union(r, paragraph.rect);
             }
             r = [
                 r[0].max(0.),
@@ -1499,7 +1516,10 @@ pub(super) fn page(e: &Editor, index: usize) -> Result<Page> {
             // The crop's white margin can include the end of a prose line
             // beside an irregular figure. That line stays native in the flow;
             // do not paint its fragment a second time inside the illustration.
-            for text in paragraphs.iter().filter(|p| !contains(r, center(p.rect))) {
+            for text in paragraphs
+                .iter()
+                .filter(|p| !is_figure_label(label_area, p, &artwork))
+            {
                 let b = text.rect;
                 let left = ((b[0] * sx).floor().max(x0 as f64) as u32).min(x1);
                 let right = ((b[2] * sx).ceil().max(x0 as f64) as u32).min(x1);
@@ -1520,7 +1540,7 @@ pub(super) fn page(e: &Editor, index: usize) -> Result<Page> {
                 continue;
             }
             let bytes = crate::ocr::encode_png(&rgba, x1 - x0, y1 - y0)?;
-            paragraphs.retain(|p| !contains(r, center(p.rect)));
+            paragraphs.retain(|p| !is_figure_label(label_area, p, &artwork));
             items.push(Item::Picture(Picture { rect: r, bytes }));
         }
     }
@@ -1881,6 +1901,21 @@ mod fraction_tests {
                 fraction: None,
             }],
         }
+    }
+    #[test]
+    fn prose_between_vector_marks_stays_editable_in_both_office_formats() {
+        let area = [10., 10., 90., 50.];
+        let marks = [[10., 10., 15., 50.], [84., 10., 90., 50.]];
+        let free = paragraph("Une phrase éditable", [20., 20., 80., 30.]);
+        let caption = paragraph("ABC", [20., 20., 40., 30.]);
+        assert!(!is_figure_label(area, &free, &marks));
+        assert!(is_figure_label(area, &caption, &marks));
+        assert!(!is_figure_label(
+            area,
+            &paragraph("suite", [96., 20., 119., 30.]),
+            &marks
+        ));
+        assert!(is_figure_label(area, &free, &[free.rect]));
     }
     #[test]
     fn worksheet_framed_exercise_number_is_not_a_fraction() {

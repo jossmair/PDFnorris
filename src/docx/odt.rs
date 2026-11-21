@@ -1,18 +1,6 @@
 //! OpenDocument Text 1.3 writer using the same flowing layout as Word.
 use super::*;
 use pdfcraft_export::Zip;
-fn xml(s: &str) -> String {
-    s.chars()
-        .filter(|c| *c >= ' ' || matches!(c, '\n' | '\t'))
-        .map(|c| match c {
-            '&' => "&amp;".into(),
-            '<' => "&lt;".into(),
-            '>' => "&gt;".into(),
-            '"' => "&quot;".into(),
-            _ => c.to_string(),
-        })
-        .collect()
-}
 fn rgb(c: [f64; 3]) -> String {
     format!(
         "#{:02X}{:02X}{:02X}",
@@ -57,13 +45,27 @@ fn declare_families(pages: &[Page]) -> String {
 fn text(s: &str) -> String {
     s.split('\n')
         .map(|line| {
-            line.split(' ')
-                .map(xml)
+            line.split('\t')
+                .map(|cell| {
+                    cell.split(' ')
+                        .map(xml)
+                        .collect::<Vec<_>>()
+                        .join("<text:s/>")
+                })
                 .collect::<Vec<_>>()
-                .join("<text:s/>")
+                .join("<text:tab/>")
         })
         .collect::<Vec<_>>()
         .join("<text:line-break/>")
+}
+
+#[cfg(test)]
+#[test]
+fn native_whitespace_survives_xml_escaping() {
+    assert_eq!(
+        text("Été\t  x<&\u{ffff}\nfin"),
+        "Été<text:tab/><text:s/><text:s/>x&lt;&amp;<text:line-break/>fin"
+    );
 }
 struct Writer {
     zip: Zip,

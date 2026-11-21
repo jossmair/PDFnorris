@@ -1,23 +1,6 @@
 use super::*;
 use pdfcraft_export::Zip;
 
-fn xml(s: &str) -> String {
-    s.chars()
-        .filter(|c| {
-            *c == '\t'
-                || *c == '\n'
-                || *c == '\r'
-                || (*c >= ' ' && *c != '\u{fffe}' && *c != '\u{ffff}')
-        })
-        .map(|c| match c {
-            '&' => "&amp;".into(),
-            '<' => "&lt;".into(),
-            '>' => "&gt;".into(),
-            '"' => "&quot;".into(),
-            _ => c.to_string(),
-        })
-        .collect()
-}
 fn twips(v: f64) -> i64 {
     (v.max(0.) * 20.).round() as i64
 }
@@ -74,7 +57,11 @@ pub(super) fn run(r: &Run) -> String {
         "<w:r><w:rPr>{properties}</w:rPr>{}</w:r>",
         r.text
             .split('\n')
-            .map(|s| format!("<w:t xml:space=\"preserve\">{}</w:t>", xml(s)))
+            .map(|line| line
+                .split('\t')
+                .map(|s| format!("<w:t xml:space=\"preserve\">{}</w:t>", xml(s)))
+                .collect::<Vec<_>>()
+                .join("<w:tab/>"))
             .collect::<Vec<_>>()
             .join("<w:br/>")
     )
