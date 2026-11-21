@@ -19,6 +19,8 @@ pub(super) struct Work {
     pub importing: Option<page_import::Job>,
     pub panel_width: f32,
     pub help_open: bool,
+    pub help_was_open: bool,
+    pub help_return_focus: Option<egui::Id>,
     pub discard_dialog: bool,
     pub discard_choice: Option<rfd::MessageDialogResult>,
     pub close_intent: Option<CloseIntent>,
@@ -46,6 +48,8 @@ impl Default for Work {
             importing: None,
             panel_width: 0.,
             help_open: false,
+            help_was_open: false,
+            help_return_focus: None,
             discard_dialog: false,
             discard_choice: None,
             close_intent: None,
@@ -476,8 +480,8 @@ impl App {
                 .map(|e| e.metadata.name.clone())
                 .collect();
             let mut recover = None;
-            egui::Modal::new(egui::Id::new("recovery")).show(ctx, |ui| {
-                ui.set_width((ctx.content_rect().width() - 80.).clamp(320., 560.));
+            let modal = egui::Modal::new(egui::Id::new("recovery")).show(ctx, |ui| {
+                ui.set_width((ctx.content_rect().width() - 64.).clamp(180., 560.));
                 egui::Frame::new()
                     .fill(icons::RAIL)
                     .corner_radius(10.)
@@ -521,7 +525,7 @@ impl App {
                                         ui.label(
                                             egui::RichText::new(display).strong().color(icons::INK),
                                         );
-                                        if ui
+                                        let response = ui
                                             .add(
                                                 egui::Button::new(
                                                     egui::RichText::new("Reprendre")
@@ -531,9 +535,21 @@ impl App {
                                                 .corner_radius(7.)
                                                 .min_size(Vec2::new(90., 32.)),
                                             )
-                                            .on_hover_text(format!("Reprendre {name}"))
-                                            .clicked()
-                                        {
+                                            .on_hover_text(format!("Reprendre {name}"));
+                                        response.widget_info(|| {
+                                            egui::WidgetInfo::labeled(
+                                                egui::WidgetType::Button,
+                                                ui.is_enabled(),
+                                                format!("Reprendre {name}"),
+                                            )
+                                        });
+                                        if response.has_focus() {
+                                            response.scroll_to_me_animation(
+                                                None,
+                                                egui::style::ScrollAnimation::none(),
+                                            );
+                                        }
+                                        if response.clicked() {
                                             recover = Some(i);
                                         }
                                     });
@@ -553,6 +569,9 @@ impl App {
                     self.work.show_recovery = false;
                 }
             });
+            if modal.should_close() {
+                self.work.show_recovery = false;
+            }
             if let Some(i) = recover {
                 let entry = self.work.journal.entries.remove(i);
                 self.work.recovering_entry = Some(entry.clone());

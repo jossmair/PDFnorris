@@ -6,6 +6,7 @@ pub(super) struct State {
     pub top_visible: bool,
     pub zoom_visible: bool,
     zoom_dragging: bool,
+    keyboard_controls: bool,
 }
 
 impl App {
@@ -29,7 +30,12 @@ impl App {
     }
 
     pub(super) fn fullscreen_keys(&mut self, ctx: &egui::Context) {
-        if self.work.discard_dialog || self.printing.open || self.recognition.is_some() {
+        if self.work.discard_dialog
+            || self.work.help_open
+            || self.work.show_recovery
+            || self.printing.open
+            || self.recognition.is_some()
+        {
             return;
         }
         if self.fullscreen.active && ctx.input_mut(|i| i.consume_key(Modifiers::NONE, Key::Escape))
@@ -43,15 +49,22 @@ impl App {
     pub(super) fn fullscreen_controls(&mut self, ctx: &egui::Context) {
         let screen = ctx.content_rect();
         let pointer = ctx.pointer_hover_pos();
-        self.fullscreen.top_visible = pointer.is_some_and(|p| {
-            p.y <= screen.top()
-                + if self.fullscreen.top_visible {
-                    58.
-                } else {
-                    10.
-                }
-        });
-        self.fullscreen.zoom_visible = self.fullscreen.zoom_dragging
+        if ctx.input(|i| i.key_pressed(Key::Tab)) {
+            self.fullscreen.keyboard_controls = true;
+        } else if ctx.input(|i| i.pointer.any_pressed()) {
+            self.fullscreen.keyboard_controls = false;
+        }
+        self.fullscreen.top_visible = self.fullscreen.keyboard_controls
+            || pointer.is_some_and(|p| {
+                p.y <= screen.top()
+                    + if self.fullscreen.top_visible {
+                        58.
+                    } else {
+                        10.
+                    }
+            });
+        self.fullscreen.zoom_visible = self.fullscreen.keyboard_controls
+            || self.fullscreen.zoom_dragging
             || pointer.is_some_and(|p| {
                 p.x <= screen.left()
                     + if self.fullscreen.zoom_visible {
@@ -192,7 +205,7 @@ impl App {
                                 ui.label(format!("{:.0} %", self.zoom * 100.));
                                 let mut zoom = self.zoom;
                                 let response = ui.add_sized(
-                                    Vec2::new(28., 220.),
+                                    Vec2::new(28., (screen.height() - 160.).clamp(48., 220.)),
                                     egui::Slider::new(&mut zoom, 0.2..=4.)
                                         .logarithmic(true)
                                         .vertical()

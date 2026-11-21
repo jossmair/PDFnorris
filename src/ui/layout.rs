@@ -188,7 +188,7 @@ impl App {
                                 .max(0.),
                         );
                         let mut number = if enabled { self.page + 1 } else { 0 };
-                        if ui
+                        let page_input = ui
                             .add_enabled_ui(enabled, |ui| {
                                 ui.add_sized(
                                     [34., 24.],
@@ -200,9 +200,11 @@ impl App {
                                 )
                             })
                             .inner
-                            .on_hover_text("Aller à la page")
-                            .changed()
-                        {
+                            .on_hover_text("Aller à la page");
+                        ui.ctx().accesskit_node_builder(page_input.id, |node| {
+                            node.set_label("Numéro de page");
+                        });
+                        if page_input.changed() {
                             self.jump = Some(number.saturating_sub(1));
                         }
                         ui.label(egui::RichText::new(label).size(11.));

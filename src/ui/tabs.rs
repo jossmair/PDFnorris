@@ -40,6 +40,14 @@ impl App {
                     let (logo, response) =
                         ui.allocate_exact_size(Vec2::new(25., 28.), egui::Sense::click_and_drag());
                     icons::draw(ui.painter(), Icon::Brand, logo.shrink(1.), Color32::WHITE);
+                    if response.has_focus() {
+                        ui.painter().rect_stroke(
+                            logo,
+                            4.,
+                            Stroke::new(2., icons::ACCENT),
+                            StrokeKind::Inside,
+                        );
+                    }
                     response.widget_info(|| {
                         egui::WidgetInfo::labeled(
                             egui::WidgetType::Button,
@@ -60,6 +68,7 @@ impl App {
                                 egui::Button::new(
                                     egui::RichText::new(label).color(Color32::WHITE).size(12.),
                                 )
+                                .selected(self.workspace == tab)
                                 .fill(if self.workspace == tab {
                                     Color32::from_rgb(190, 76, 5)
                                 } else {
@@ -105,6 +114,7 @@ impl App {
                                                                 .color(Color32::WHITE)
                                                                 .size(11.),
                                                         )
+                                                        .selected(index == self.active_document)
                                                         .frame(false)
                                                         .sense(egui::Sense::click_and_drag())
                                                         .min_size(Vec2::new(124., 25.)),
@@ -294,11 +304,11 @@ impl App {
                     if free > 1. {
                         let (_, response) = ui.allocate_exact_size(
                             Vec2::new(free, 28.),
-                            egui::Sense::click_and_drag(),
+                            egui::Sense::CLICK | egui::Sense::DRAG,
                         );
                         response.widget_info(|| {
                             egui::WidgetInfo::labeled(
-                                egui::WidgetType::Button,
+                                egui::WidgetType::Other,
                                 true,
                                 "Barre de titre",
                             )

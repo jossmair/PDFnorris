@@ -1,6 +1,13 @@
 # Recette Windows, clavier et NVDA
 
-Statut : protocole à exécuter. Il ne constitue pas une validation NVDA ou DPI.
+Le 21 novembre 2026, la copie portable française de NVDA 2026.3 a été
+lancée sur Windows avec la fixture synthétique A. Windows UI Automation a
+exposé le logo comme bouton « Aide et réglages · F1 » et un appui sur Tab
+lui a donné le focus. La visionneuse de parole de NVDA a été ouverte.
+La parole produite pour ce contrôle, la lecture du document et la recette
+complète des parcours restent à vérifier. L’arbre Windows a également révélé
+que le sélecteur de page exposait sa valeur sans nom. Le correctif associe
+le nom « Numéro de page » à ce contrôle natif.
 
 Consigner la version de Windows, de PDFnorris et de NVDA, la résolution, le facteur
 Windows, la taille d’interface choisie et le périphérique utilisé. Garder le

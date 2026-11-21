@@ -65,6 +65,7 @@ impl App {
                     } else {
                         icons::INK
                     }))
+                    .selected(selected)
                     .fill(if selected {
                         icons::ACCENT
                     } else {
@@ -72,7 +73,11 @@ impl App {
                     })
                     .corner_radius(8.)
                     .min_size(Vec2::new(84., 30.));
-                if ui.add(button).clicked() {
+                let response = ui.add(button);
+                if response.has_focus() {
+                    response.scroll_to_me_animation(None, egui::style::ScrollAnimation::none());
+                }
+                if response.clicked() {
                     size = value;
                 }
             }

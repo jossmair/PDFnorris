@@ -121,6 +121,43 @@ impl Icon {
             Self::Fullscreen => "Lecture plein écran · F11",
         }
     }
+    fn widget(self, enabled: bool, active: bool, label: &str) -> egui::WidgetInfo {
+        use Icon::*;
+        if matches!(
+            self,
+            Select
+                | Hand
+                | Move
+                | Edit
+                | Text
+                | Image
+                | Drawing
+                | Line
+                | Circle
+                | Square
+                | Rectangle
+                | Table
+                | Highlight
+                | Comment
+                | Width
+                | Page
+                | Bold
+                | Italic
+                | Underline
+                | Strike
+                | Superscript
+                | Subscript
+                | AlignLeft
+                | AlignRight
+                | AlignCenter
+                | AlignJustify
+                | Bullets
+        ) {
+            egui::WidgetInfo::selected(egui::WidgetType::Button, enabled, active, label)
+        } else {
+            egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, label)
+        }
+    }
     fn source(self) -> egui::ImageSource<'static> {
         match self {
             Self::Brand => egui::include_image!("../assets/pdfnorris.svg"),
@@ -214,7 +251,7 @@ pub fn button(
             Sense::hover()
         },
     );
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, label));
+    response.widget_info(|| icon.widget(enabled && ui.is_enabled(), active, label));
     let motion = ui
         .ctx()
         .data(|d| d.get_temp::<bool>(egui::Id::new("animations")))
@@ -281,8 +318,7 @@ pub fn chip(ui: &mut egui::Ui, icon: Icon, label: &str, active: bool) -> Respons
     } else {
         label
     };
-    response
-        .widget_info(|| egui::WidgetInfo::labeled(egui::WidgetType::Button, enabled, accessible));
+    response.widget_info(|| icon.widget(enabled, active, accessible));
     if enabled && (active || response.hovered() || response.has_focus()) {
         ui.painter().rect_filled(
             rect,

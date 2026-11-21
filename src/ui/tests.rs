@@ -1,4 +1,257 @@
 use super::*;
+
+fn p0_key(ctx: &egui::Context, app: &mut App, key: Key, modifiers: Modifiers) -> egui::FullOutput {
+    input_frame(
+        ctx,
+        app,
+        vec![egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers,
+        }],
+    );
+    input_frame(
+        ctx,
+        app,
+        vec![egui::Event::Key {
+            key,
+            physical_key: None,
+            pressed: false,
+            repeat: false,
+            modifiers,
+        }],
+    )
+}
+
+fn p0_tab_to(ctx: &egui::Context, app: &mut App, label: &str) {
+    for _ in 0..80 {
+        let out = p0_key(ctx, app, Key::Tab, Modifiers::NONE);
+        let tree = out.platform_output.accesskit_update.as_ref().unwrap();
+        if tree
+            .nodes
+            .iter()
+            .any(|(id, n)| *id == tree.focus && n.label() == Some(label))
+        {
+            return;
+        }
+    }
+    panic!("Tab never reached {label}");
+}
+
+#[test]
+fn p0_brand_keyboard_activation_and_help_focus_roundtrip() {
+    for key in [Key::Enter, Key::Space] {
+        let (ctx, mut app) = setup();
+        ctx.enable_accesskit();
+        let original = app.editor.as_ref().unwrap().bytes.clone();
+        for _ in 0..3 {
+            input_frame(&ctx, &mut app, vec![]);
+        }
+        p0_tab_to(&ctx, &mut app, "Aide et réglages · F1");
+        let opener = ctx.memory(|m| m.focused());
+        p0_key(&ctx, &mut app, key, Modifiers::NONE);
+        assert!(app.work.help_open, "{key:?} must open help");
+        let out = input_frame(&ctx, &mut app, vec![]);
+        let tree = out.platform_output.accesskit_update.as_ref().unwrap();
+        assert!(
+            tree.nodes
+                .iter()
+                .any(|(id, n)| *id == tree.focus && n.label() == Some("Fermer l’aide")),
+            "Focus must enter help"
+        );
+        p0_key(&ctx, &mut app, Key::Escape, Modifiers::NONE);
+        assert!(!app.work.help_open);
+        input_frame(&ctx, &mut app, vec![]);
+        assert_eq!(
+            ctx.memory(|m| m.focused()),
+            opener,
+            "Closing help must restore focus"
+        );
+        assert_eq!(app.editor.as_ref().unwrap().bytes, original);
+    }
+}
+
+#[test]
+fn p0_modes_and_interface_sizes_expose_their_selected_state() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![]);
+    }
+    let out = input_frame(&ctx, &mut app, vec![]);
+    let nodes = &out.platform_output.accesskit_update.as_ref().unwrap().nodes;
+    for (label, selected) in [("Lecture", true), ("Modifier", false), ("Pages", false)] {
+        let n = &nodes
+            .iter()
+            .find(|(_, n)| n.label() == Some(label))
+            .unwrap()
+            .1;
+        assert_eq!(
+            n.toggled(),
+            Some(if selected {
+                egui::accesskit::Toggled::True
+            } else {
+                egui::accesskit::Toggled::False
+            }),
+            "Mode {label}"
+        );
+    }
+    app.work.help_open = true;
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![]);
+    }
+    let out = input_frame(&ctx, &mut app, vec![]);
+    let nodes = &out.platform_output.accesskit_update.as_ref().unwrap().nodes;
+    for (label, selected) in [("Normale", true), ("Grande", false), ("Très grande", false)] {
+        let n = &nodes
+            .iter()
+            .find(|(_, n)| n.label() == Some(label))
+            .unwrap()
+            .1;
+        assert_eq!(
+            n.toggled(),
+            Some(if selected {
+                egui::accesskit::Toggled::True
+            } else {
+                egui::accesskit::Toggled::False
+            }),
+            "Size {label}"
+        );
+    }
+}
+
+#[test]
+fn page_number_exposes_both_a_label_and_its_numeric_value() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    let out = input_frame(&ctx, &mut app, vec![]);
+    let tree = out.platform_output.accesskit_update.unwrap();
+    let page = tree
+        .nodes
+        .iter()
+        .map(|(_, n)| n)
+        .find(|n| n.label() == Some("Numéro de page"))
+        .expect("named page control");
+    assert_eq!(page.role(), egui::accesskit::Role::SpinButton);
+    assert_eq!(page.numeric_value(), Some(1.0));
+}
+
+#[test]
+fn p0_fullscreen_exposes_controls_on_tab_and_escape_closes_help_first() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    app.set_fullscreen(&ctx, true);
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![egui::Event::PointerGone]);
+    }
+    p0_key(&ctx, &mut app, Key::Tab, Modifiers::NONE);
+    assert!(
+        app.fullscreen.top_visible && app.fullscreen.zoom_visible,
+        "Keyboard users need the hidden controls"
+    );
+    p0_tab_to(&ctx, &mut app, "Zoom du PDF");
+    let zoom = app.zoom;
+    p0_key(&ctx, &mut app, Key::ArrowUp, Modifiers::NONE);
+    assert!(app.zoom > zoom, "Zoom must work without a wheel");
+    p0_key(&ctx, &mut app, Key::F1, Modifiers::NONE);
+    assert!(app.work.help_open);
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![]);
+    }
+    p0_key(&ctx, &mut app, Key::Escape, Modifiers::NONE);
+    assert!(
+        !app.work.help_open && app.fullscreen.active,
+        "Escape must close the top modal before fullscreen"
+    );
+    p0_key(&ctx, &mut app, Key::Escape, Modifiers::NONE);
+    assert!(!app.fullscreen.active);
+}
+
+#[test]
+fn p0_help_focused_controls_stay_inside_small_logical_viewports() {
+    for size in [
+        Vec2::new(760., 540.),
+        Vec2::new(640., 360.),
+        Vec2::new(426., 240.),
+        Vec2::new(284., 160.),
+    ] {
+        let (ctx, mut app) = setup();
+        ctx.enable_accesskit();
+        app.work.help_open = true;
+        let mut out = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+                ..Default::default()
+            },
+            |ui| app.frame_ui(ui),
+        );
+        out.textures_delta.clear();
+        for _ in 0..3 {
+            input_frame(&ctx, &mut app, vec![]);
+        }
+        for label in ["Fermer l’aide", "Normale", "Grande", "Très grande"] {
+            p0_tab_to(&ctx, &mut app, label);
+            // egui scrolls the focused command into view on the following frame.
+            for _ in 0..4 {
+                input_frame(&ctx, &mut app, vec![]);
+            }
+            let out = input_frame(&ctx, &mut app, vec![]);
+            let tree = out.platform_output.accesskit_update.as_ref().unwrap();
+            let bounds = tree
+                .nodes
+                .iter()
+                .find(|(id, n)| *id == tree.focus && n.label() == Some(label))
+                .unwrap()
+                .1
+                .bounds()
+                .unwrap();
+            assert!(
+                bounds.x0 >= 0.
+                    && bounds.y0 >= 0.
+                    && bounds.x1 <= size.x as f64
+                    && bounds.y1 <= size.y as f64,
+                "{label} outside {size:?}: {bounds:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn p0_recovery_escape_keeps_drafts_and_labels_identify_each_document() {
+    let (ctx, mut app) = setup();
+    ctx.enable_accesskit();
+    let original = app.editor.as_ref().unwrap().bytes.clone();
+    for name in ["Premier.pdf", "Second.pdf"] {
+        app.work.journal.entries.push(pdfnorris::recovery::Entry {
+            pdf: PathBuf::from("test-output/nonexistent.pdf"),
+            metadata: pdfnorris::recovery::Metadata {
+                name: name.into(),
+                draft: String::new(),
+                state: None,
+                checkpoint: None,
+            },
+        });
+    }
+    app.work.show_recovery = true;
+    for _ in 0..3 {
+        input_frame(&ctx, &mut app, vec![]);
+    }
+    let out = input_frame(&ctx, &mut app, vec![]);
+    let nodes = &out.platform_output.accesskit_update.as_ref().unwrap().nodes;
+    for label in ["Reprendre Premier.pdf", "Reprendre Second.pdf"] {
+        assert!(
+            nodes.iter().any(|(_, n)| n.label() == Some(label)),
+            "Missing {label}"
+        );
+    }
+    p0_key(&ctx, &mut app, Key::Escape, Modifiers::NONE);
+    assert!(!app.work.show_recovery);
+    assert_eq!(app.work.journal.entries.len(), 2);
+    assert_eq!(app.editor.as_ref().unwrap().bytes, original);
+    assert!(app.work.opening.is_none());
+}
 #[test]
 fn history_budget_is_shared_by_active_and_inactive_tabs_without_changing_documents() {
     let (_, mut app) = setup();
