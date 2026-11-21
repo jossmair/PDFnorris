@@ -108,9 +108,18 @@ pub(super) fn prepare(
                 }
                 255.
             };
-            let white = percentile(90);
-            let black = percentile(2).min(white - 12.);
-            levels.push((black, white));
+            let paper = percentile(75);
+            let highlight = percentile(99);
+            let levels_for_tile =
+                if paper <= 96. && paper - percentile(10) < 32. && highlight >= paper + 24. {
+                    // Sparse light lettering on dark paper. The ordinary 90th
+                    // percentile can still be background and wash the letters out.
+                    (highlight, paper)
+                } else {
+                    let white = percentile(90);
+                    (percentile(2).min(white - 12.), white)
+                };
+            levels.push(levels_for_tile);
         }
     }
     let mut normalized = Vec::with_capacity(gray.len());
@@ -148,11 +157,12 @@ pub(super) fn merge(first: &mut Recognition, second: Recognition, sx: f32, sy: f
     let mut occupied = first
         .lines
         .iter()
-        .flat_map(|l| &l.words)
-        .map(|w| w.rect)
+        .enumerate()
+        .flat_map(|(line, l)| l.words.iter().map(move |w| (line, w.rect)))
         .collect::<Vec<_>>();
     for line in second.lines {
         let mut words = Vec::new();
+        let mut anchors = std::collections::BTreeSet::new();
         for mut word in line.words {
             word.rect = [
                 word.rect[0] * sx,
@@ -160,7 +170,7 @@ pub(super) fn merge(first: &mut Recognition, second: Recognition, sx: f32, sy: f
                 word.rect[2] * sx,
                 word.rect[3] * sy,
             ];
-            if occupied.iter().any(|r| {
+            let overlaps = |r: &[f32; 4]| {
                 let overlap = [
                     r[0].max(word.rect[0]),
                     r[1].max(word.rect[1]),
@@ -168,15 +178,61 @@ pub(super) fn merge(first: &mut Recognition, second: Recognition, sx: f32, sy: f
                     r[3].min(word.rect[3]),
                 ];
                 area(overlap) > 0.2 * area(*r).min(area(word.rect))
-            }) {
+            };
+            if let Some((owner, _)) = occupied.iter().find(|(_, r)| overlaps(r)) {
+                anchors.insert(*owner);
                 continue;
             }
-            occupied.push(word.rect);
-            words.push(word);
+            if !words.iter().any(|w: &super::Word| overlaps(&w.rect)) {
+                words.push(word);
+            }
         }
         if words.is_empty() {
             continue;
         }
+        // Only rejoin a fragment when the second pass independently places it
+        // on a known line. Preserve the source reading order for other scripts.
+        if anchors.len() == 1 {
+            let index = *anchors.first().unwrap();
+            let old = &mut first.lines[index];
+            let left_to_right = old.words.windows(2).all(|w| w[0].rect[0] <= w[1].rect[0])
+                && old.words.iter().chain(&words).all(|w| {
+                    w.text
+                        .chars()
+                        .all(|c| !c.is_alphabetic() || c <= '\u{024f}')
+                });
+            let nearby = words.iter().all(|w| {
+                old.words.iter().any(|neighbor| {
+                    let a = w.rect;
+                    let b = neighbor.rect;
+                    let h = (a[3] - a[1]).min(b[3] - b[1]);
+                    a[3].min(b[3]) - a[1].max(b[1]) >= h * 0.6
+                        && (a[0] - b[2]).max(b[0] - a[2]) < h * 1.7
+                })
+            });
+            if left_to_right && nearby {
+                for w in words {
+                    let r = w.rect;
+                    old.rect = [
+                        old.rect[0].min(r[0]),
+                        old.rect[1].min(r[1]),
+                        old.rect[2].max(r[2]),
+                        old.rect[3].max(r[3]),
+                    ];
+                    occupied.push((index, r));
+                    old.words.push(w);
+                }
+                old.words.sort_by(|a, b| a.rect[0].total_cmp(&b.rect[0]));
+                old.text = old
+                    .words
+                    .iter()
+                    .map(|w| w.text.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                continue;
+            }
+        }
+        occupied.extend(words.iter().map(|w| (first.lines.len(), w.rect)));
         let rect = words.iter().fold(
             [
                 f32::INFINITY,
@@ -293,6 +349,31 @@ pub(super) fn repair_degrees(rgba: &[u8], width: u32, height: u32, result: &mut 
 #[cfg(test)]
 mod tests {
     #[test]
+    fn sparse_light_glyphs_remain_visible_in_the_second_ocr_pass() {
+        let mut pixels = vec![255; 64 * 64 * 4];
+        for (i, pixel) in pixels.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+            let x = i % 64;
+            let y = i / 64;
+            pixel[..3].fill(if (20..24).contains(&x) && (12..44).contains(&y) {
+                180
+            } else {
+                32
+            });
+        }
+        let (enhanced, w, _) = super::prepare(
+            &pixels,
+            64,
+            64,
+            &super::Recognition {
+                language: "fr-FR".into(),
+                lines: vec![],
+            },
+        );
+        let sample = |x, y| enhanced[((y * w + x) * 4) as usize];
+        assert!(sample(w / 3, w / 2) < 16);
+        assert!(sample(w / 2, w / 2) > 240);
+    }
+    #[test]
     fn numeric_grid_corrects_a_one_without_changing_a_diagram_label() {
         let mut result = super::Recognition {
             language: "fr-FR".into(),
@@ -390,6 +471,27 @@ mod tests {
         merge(&mut first, second, 0.5, 0.5);
         assert_eq!(first.text(), "Paris\nLyon");
         assert_eq!(first.lines[1].words[0].rect, [50., 5., 60., 20.]);
+    }
+
+    #[test]
+    fn recovered_middle_word_returns_to_the_line_that_both_passes_identify() {
+        let word = |text: &str, x| Word {
+            text: text.into(),
+            rect: [x, 2., x + 10., 13.],
+        };
+        let mut first = Recognition {
+            language: "fr-FR".into(),
+            lines: vec![Line {
+                rect: [2., 2., 44., 13.],
+                text: "Été doux".into(),
+                words: vec![word("Été", 2.), word("doux", 34.)],
+            }],
+        };
+        let mut second = first.clone();
+        second.lines[0].words.insert(1, word("très", 18.));
+        merge(&mut first, second, 1., 1.);
+        assert_eq!(first.text(), "Été très doux");
+        assert_eq!(first.blocks().len(), 1);
     }
     #[test]
     #[cfg(windows)]
