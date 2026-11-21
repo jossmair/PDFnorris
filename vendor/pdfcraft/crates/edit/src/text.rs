@@ -527,21 +527,29 @@ struct Ts {
     render_mode: i64,
 }
 
-fn content_streams(doc: &Document, page: &Dict) -> Vec<(Object, Vec<u8>)> {
+// Editing requires a complete inventory. Never interpret a damaged or oversized
+// stream as empty: its graphics/text state may affect all subsequent streams.
+fn content_streams(doc: &Document, page: &Dict) -> Result<Vec<(Object, Vec<u8>)>, EditError> {
     let list: Vec<Object> = match page.get(b"Contents") {
         None => Vec::new(),
         Some(c) => match &*doc.resolve(c) {
+            Object::Array(a) if a.len() > 4096 => return Err(EditError::Invalid("too many content streams for reliable text editing".into())),
             Object::Array(a) => a.clone(),
             _ => vec![c.clone()],
         },
     };
+    let mut remaining: usize = 16 * 1024 * 1024;
     list.into_iter()
         .map(|o| {
-            let data = match &*doc.resolve(&o) {
-                Object::Stream(s) => s.decoded().unwrap_or_default(),
-                _ => Vec::new(),
+            let resolved = doc.resolve(&o);
+            let Object::Stream(stream) = resolved.as_ref() else {
+                return Err(EditError::Invalid("invalid content stream: text editing refused".into()));
             };
-            (o, data)
+            let data = stream
+                .decoded_strict_within(remaining)
+                .map_err(|_| EditError::Invalid("content stream cannot be decoded within the text editing budget".into()))?;
+            remaining = remaining.saturating_sub(data.len());
+            Ok((o, data))
         })
         .collect()
 }
@@ -587,6 +595,8 @@ pub(crate) fn rewritten_contents(doc: &mut Document, streams: &[(Object, Vec<u8>
             _ => Dict::new(),
         };
         dict.remove(b"Length");
+        // The decoded length hint belongs to the old bytes (upstream PageStreams::write).
+        dict.remove(b"DL");
         contents.push(Object::Ref(doc.add(Object::Stream(Stream::flate(dict, &data)))));
     }
     match <[Object; 1]>::try_from(contents) {
@@ -1104,7 +1114,7 @@ pub fn text_lines(doc: &Document, page: usize) -> Result<Vec<TextLine>, EditErro
     let mut carry = Carry::new();
     // The streams are one stream in pieces (§7.8.2), split between any two tokens: parse them
     // joined, so an operator whose operands end one piece still has them.
-    let pieces = Pieces::join(&content_streams(doc, &p.dict).into_iter().map(|(_, d)| d).collect::<Vec<_>>());
+    let pieces = Pieces::join(&content_streams(doc, &p.dict)?.into_iter().map(|(_, d)| d).collect::<Vec<_>>());
     let ops = pieces.parse().ops;
     let properties = res.get(b"Properties").and_then(|o| doc.dict(o)).unwrap_or_default();
     let shown = interpret(doc, &ops, &fonts_res, &mut cache, &mut carry, None, Some(&properties));
@@ -1438,7 +1448,7 @@ fn reading_lines(doc: &Document, page: usize) -> Result<(Vec<TextLine>, bool), E
     }
     let p = page_dict(doc, page)?;
     let res = p.dict.get(b"Resources").map(|r| doc.resolve(r)).and_then(|r| r.as_dict().cloned()).unwrap_or_default();
-    let streams = content_streams(doc, &p.dict);
+    let streams = content_streams(doc, &p.dict)?;
     let mut w = Walk { doc, lines: Vec::new(), next_stream: streams.len(), path: Vec::new(), budget: FormBudget::default() };
     let mut carry = Carry::new();
     // Read the page's streams as the one stream they are, in one pass, as rendering and editing
@@ -1900,7 +1910,7 @@ pub(crate) fn replace_line_with_limit(doc: &mut Document, page: usize, line: usi
     let p = page_dict(doc, page)?;
     let mut res = p.dict.get(b"Resources").map(|r| doc.resolve(r)).and_then(|r| r.as_dict().cloned()).unwrap_or_default();
     let mut fonts_res = res.get(b"Font").map(|f| doc.resolve(f)).and_then(|f| f.as_dict().cloned()).unwrap_or_default();
-    let streams = content_streams(doc, &p.dict);
+    let streams = content_streams(doc, &p.dict)?;
     let pieces = Pieces::join(&streams.iter().map(|(_, d)| d.as_slice()).collect::<Vec<_>>());
     let ops = pieces.parse().ops;
     let first = target.ops.first().copied().filter(|i| *i < ops.len()).ok_or_else(|| EditError::Invalid("the page's content changed".into()))?;
@@ -2067,10 +2077,11 @@ pub fn clear_blocks(doc: &mut Document, page: usize, selected: &[usize]) -> Resu
     }
     let mut drops = coincident_ops(&lines, &targets);
     drops.extend(targets.iter().flat_map(|l| l.ops.iter().copied()));
+    refuse_clipping_text(&lines, &drops)?;
     let p = page_dict(doc, page)?;
     let res = p.dict.get(b"Resources").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();
     let fonts = res.get(b"Font").and_then(|r| doc.resolve(r).as_dict().cloned()).unwrap_or_default();
-    let streams = content_streams(doc, &p.dict);
+    let streams = content_streams(doc, &p.dict)?;
     let pieces = Pieces::join(&streams.iter().map(|(_, d)| d.as_slice()).collect::<Vec<_>>());
     let ops = pieces.parse().ops;
     let shown = interpret(doc, &ops, &fonts, &mut HashMap::new(), &mut Carry::new(), None, None);
@@ -2277,7 +2288,7 @@ pub fn formatting_all(doc: &Document, page: usize) -> Result<std::collections::H
     let lines = text_lines(doc, page)?;
     let blocks = group_blocks(doc, &lines);
     let p = page_dict(doc, page)?;
-    let streams = content_streams(doc, &p.dict);
+    let streams = content_streams(doc, &p.dict)?;
     let pieces = Pieces::join(&streams.iter().map(|(_, data)| data.as_slice()).collect::<Vec<_>>());
     let ops = pieces.parse().ops;
     Ok(blocks
@@ -2401,7 +2412,7 @@ fn rewrite_block_from(
     {
         return rewrite_styled_block(doc, page, &b, &lines, text, style);
     }
-    let streams = content_streams(doc, &p.dict);
+    let streams = content_streams(doc, &p.dict)?;
     let pieces = Pieces::join(&streams.iter().map(|(_, d)| d.as_slice()).collect::<Vec<_>>());
     let ops = pieces.parse().ops;
     // Explicit line breaks stay (#1443); within a line, runs of white space become one space.
@@ -2778,7 +2789,7 @@ pub(crate) fn selectable_blocks(
     excluded: &std::collections::BTreeSet<pdfcraft_cos::ObjRef>,
 ) -> Result<Vec<(usize, TextBlock)>, EditError> {
     let p = page_dict(doc, page)?;
-    let streams = content_streams(doc, &p.dict);
+    let streams = content_streams(doc, &p.dict)?;
     let lines = text_lines(doc, page)?;
     Ok(group_blocks(doc, &lines)
         .into_iter()
@@ -2849,7 +2860,7 @@ pub(crate) fn translate_blocks(doc: &mut Document, page: usize, indexes: &[usize
         return Ok(());
     }
     let p = page_dict(doc, page)?;
-    let streams = content_streams(doc, &p.dict);
+    let streams = content_streams(doc, &p.dict)?;
     let lines = text_lines(doc, page)?;
     let blocks = group_blocks(doc, &lines);
     let mut selected = std::collections::BTreeSet::new();
