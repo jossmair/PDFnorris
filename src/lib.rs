@@ -1,6 +1,7 @@
 pub mod document;
 pub mod docx;
 pub mod drawing;
+mod engine;
 pub mod files;
 pub mod forms;
 pub mod ocr;

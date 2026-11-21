@@ -1,4 +1,5 @@
-use pdfcraft_cos::{Document, SaveOptions};
+use crate::engine;
+use pdfcraft_cos::Document;
 use pdfcraft_edit::{AddedImage, AddedText, BlockStyle, Content, TextBlock};
 use pdfcraft_render::{DocInfo, PageRenderer, PageText, RenderConfig, RenderRequest, RequestKind};
 use std::{
@@ -80,10 +81,8 @@ impl Editor {
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         guarded(|| {
             let bytes = Arc::new(bytes);
-            let doc = Document::open(bytes.clone()).map_err(|e| {
-                format!("Ouverture impossible (document éventuellement protégé) : {e}")
-            })?;
-            let info = pdfcraft_render::inspect(bytes.clone(), None).map_err(|e| e.to_string())?;
+            let doc = engine::open(&bytes)?;
+            let info = engine::inspect(&bytes)?;
             if info.pages.is_empty() {
                 return Err("Ce PDF ne contient aucune page lisible.".into());
             }
@@ -241,11 +240,8 @@ impl Editor {
         let (doc, bytes, info) = guarded(|| {
             let mut doc = self.doc.clone();
             f(&mut doc)?;
-            let bytes = Arc::new(
-                pdfcraft_cos::write_incremental(&doc, &SaveOptions::default())
-                    .map_err(|e| e.to_string())?,
-            );
-            let info = pdfcraft_render::inspect(bytes.clone(), None).map_err(|e| e.to_string())?;
+            let bytes = engine::serialize(&doc)?;
+            let info = engine::inspect(&bytes)?;
             if info.pages.len() != expected_pages {
                 return Err(
                     "Le nombre de pages obtenu est incorrect : modification refusée.".into(),
@@ -362,8 +358,7 @@ impl Editor {
         let Some(snapshot) = stack.last().cloned() else {
             return Ok(());
         };
-        let info =
-            pdfcraft_render::inspect(snapshot.bytes.clone(), None).map_err(|e| e.to_string())?;
+        let info = engine::inspect(&snapshot.bytes)?;
         let current = self.snapshot();
         if redo {
             self.redo.pop();
@@ -660,9 +655,7 @@ impl Editor {
             } else {
                 return Ok(self.bytes.clone());
             }
-            pdfcraft_cos::write_incremental(&doc, &SaveOptions::default())
-                .map(Arc::new)
-                .map_err(|e| e.to_string())
+            engine::serialize(&doc)
         })
     }
     pub fn revision(&self) -> u64 {
@@ -1116,9 +1109,7 @@ impl Editor {
                 dict.remove(b"Annots");
             })
             .map_err(|e| e.to_string())?;
-            let bytes = pdfcraft_cos::write_incremental(&doc, &SaveOptions::default())
-                .map_err(|e| e.to_string())?;
-            Ok((Arc::new(bytes), view))
+            Ok((engine::serialize(&doc)?, view))
         })
     }
     /// Retain visible PDF labels, and partial invisible layers crossing this image.
@@ -1552,7 +1543,7 @@ pub struct SaveTask {
 impl SaveTask {
     pub fn write(&self) -> Result<()> {
         guarded(|| {
-            Document::open(self.bytes.clone()).map_err(|e| e.to_string())?;
+            engine::open(&self.bytes)?;
             if self.path.exists()
                 && let Some(expected) = &self.expected
                 && crate::files::read(&self.path)?.as_slice() != expected.as_slice()
