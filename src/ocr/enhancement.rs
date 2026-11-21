@@ -1,6 +1,86 @@
 //! A second local recognition pass for faint scans and small type. Coordinates
 //! always return to the original image; the enhanced pixels are never saved.
-use super::{Line, Recognition};
+use super::{Line, Recognition, Word};
+
+pub(super) fn close_pair(pair: &[Word]) -> bool {
+    let (a, b) = (pair[0].rect, pair[1].rect);
+    let h = (a[3] - a[1]).min(b[3] - b[1]);
+    h > 0.
+        && a[0] < b[0]
+        && b[0] - a[2] <= h * 0.4
+        && a[3].min(b[3]) - a[1].max(b[1]) >= h * 0.5
+        && pair
+            .iter()
+            .all(|w| !w.text.is_empty() && w.text.chars().all(char::is_alphabetic))
+}
+
+pub(super) fn confirm_joined_words(result: &mut Recognition, check: &Recognition) {
+    let mut by_text = std::collections::HashMap::<&str, Vec<[f32; 4]>>::new();
+    for w in check.lines.iter().flat_map(|line| &line.words) {
+        by_text.entry(&w.text).or_default().push(w.rect);
+    }
+    for line in &mut result.lines {
+        let mut i = 0;
+        while i + 1 < line.words.len() {
+            let pair = &line.words[i..i + 2];
+            if close_pair(pair) {
+                let joined = format!("{}{}", pair[0].text, pair[1].text);
+                let (a, b) = (pair[0].rect, pair[1].rect);
+                let bounds = [a[0], a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])];
+                let tolerance = (bounds[3] - bounds[1]) * 0.3;
+                if by_text.get(joined.as_str()).is_some_and(|boxes| {
+                    boxes.iter().any(|r| {
+                        r.iter()
+                            .zip(bounds)
+                            .all(|(x, y)| (*x - y).abs() <= tolerance)
+                    })
+                }) {
+                    line.words[i] = Word {
+                        text: joined,
+                        rect: bounds,
+                    };
+                    line.words.remove(i + 1);
+                }
+            }
+            i += 1;
+        }
+    }
+}
+
+/// On near-monochrome dark paper, give the recognizer dark ink on white at
+/// the original resolution. Keep photographs and transparent artwork in color.
+pub(super) fn dark_paper(rgba: &[u8]) -> Option<Vec<u8>> {
+    let pixels = rgba.as_chunks::<4>().0;
+    let stride = (pixels.len() / 65536).max(1);
+    let mut hist = [0usize; 256];
+    let luminance =
+        |p: &[u8; 4]| (77 * p[0] as usize + 150 * p[1] as usize + 29 * p[2] as usize) / 256;
+    let count = pixels.len().div_ceil(stride);
+    for p in pixels.iter().step_by(stride) {
+        if p[3] != 255 || p[0].abs_diff(p[1]).max(p[1].abs_diff(p[2])) > 12 {
+            return None;
+        }
+        hist[luminance(p)] += 1;
+    }
+    let (paper, &frequency) = hist.iter().enumerate().max_by_key(|(_, n)| *n)?;
+    if paper > 90 || frequency * 100 < count * 90 {
+        return None;
+    }
+    let mut n = 0;
+    let ink = (0..256).rev().find(|&i| {
+        n += hist[i];
+        n >= count.div_ceil(1000)
+    })?;
+    if ink < paper + 24 {
+        return None;
+    }
+    let mut image = rgba.to_vec();
+    for p in image.as_chunks_mut::<4>().0 {
+        let level = 255 - (255 * luminance(p).saturating_sub(paper) / (ink - paper)).min(255);
+        p[..3].fill(level as u8);
+    }
+    Some(image)
+}
 
 /// An isolated 1 is often read as I/l. Change it only inside a numeric grid
 /// supported by at least three existing digits on both its row and column.
@@ -348,6 +428,48 @@ pub(super) fn repair_degrees(rgba: &[u8], width: u32, height: u32, result: &mut 
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn joining_two_fragments_requires_matching_text_and_location() {
+        let word = |s: &str, x, y, w| super::Word {
+            text: s.into(),
+            rect: [x, y, x + w, y + 10.],
+        };
+        let recognition = |words| super::Recognition {
+            language: "fr-FR".into(),
+            lines: vec![super::Line {
+                text: String::new(),
+                rect: [0., 0., 80., 30.],
+                words,
+            }],
+        };
+        let mut first = recognition(vec![
+            word("Cal", 0., 0., 12.),
+            word("culer", 13., 0., 20.),
+            word("la", 42., 0., 8.),
+        ]);
+        super::confirm_joined_words(
+            &mut first,
+            &recognition(vec![word("Calculer", 0., 20., 33.)]),
+        );
+        assert_eq!(first.lines[0].words.len(), 3);
+        super::confirm_joined_words(
+            &mut first,
+            &recognition(vec![word("Calculer", 0., 0., 33.)]),
+        );
+        assert_eq!(first.lines[0].words[0].text, "Calculer");
+        assert_eq!(first.lines[0].words[1].text, "la");
+    }
+    #[test]
+    fn uniform_dark_paper_is_inverted_while_color_and_transparency_are_preserved() {
+        let mut pixels = [36, 36, 36, 255].repeat(1000);
+        pixels[0..4].copy_from_slice(&[70, 70, 70, 255]);
+        let prepared = super::dark_paper(&pixels).unwrap();
+        assert_eq!(prepared[..8], [0, 0, 0, 255, 255, 255, 255, 255]);
+        pixels[0] = 180;
+        assert!(super::dark_paper(&pixels).is_none());
+        pixels[..4].copy_from_slice(&[70, 70, 70, 0]);
+        assert!(super::dark_paper(&pixels).is_none());
+    }
     #[test]
     fn sparse_light_glyphs_remain_visible_in_the_second_ocr_pass() {
         let mut pixels = vec![255; 64 * 64 * 4];

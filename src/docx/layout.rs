@@ -698,6 +698,22 @@ fn join_lines(mut input: Vec<Paragraph>, gap: f64) -> Vec<Paragraph> {
         })
         .collect()
 }
+/// The Office table model uses a shared border style. Weight source styles
+/// by their drawn length so a short white spacer cannot recolor a whole grid.
+fn grid_border(lines: &[Line]) -> Option<(f64, [f64; 3])> {
+    let mut colors = std::collections::BTreeMap::new();
+    let mut width = f64::INFINITY;
+    for line in lines {
+        width = width.min(line.width);
+        let key = line.color.map(|c| (255. * c.clamp(0., 1.)).round() as u8);
+        let entry = colors.entry(key).or_insert((0., line.color));
+        entry.0 += (line.b[0] - line.a[0]).hypot(line.b[1] - line.a[1]);
+    }
+    colors
+        .into_values()
+        .max_by(|a, b| a.0.total_cmp(&b.0))
+        .map(|(_, c)| (width.clamp(0.125, 12.), c))
+}
 fn grid(lines: &[Line], paragraphs: &[Paragraph], fills: &[([f64; 4], [f64; 3])]) -> Option<Table> {
     let xs = edges(
         lines
@@ -799,18 +815,14 @@ fn grid(lines: &[Line], paragraphs: &[Paragraph], fills: &[([f64; 4], [f64; 3])]
         }
         rows.push(row);
     }
-    let border = lines
-        .iter()
-        .map(|l| l.width)
-        .fold(f64::INFINITY, f64::min)
-        .clamp(0.125, 12.);
+    let (border, color) = grid_border(lines)?;
     Some(Table {
         rect,
         xs,
         ys,
         rows,
         border,
-        color: lines[0].color,
+        color,
     })
 }
 
@@ -1653,6 +1665,25 @@ pub(super) fn page(e: &Editor, index: usize) -> Result<Page> {
 #[cfg(test)]
 mod fraction_tests {
     use super::*;
+    #[test]
+    fn white_spacer_does_not_set_the_entire_table_border() {
+        let make = |length, width, color| Line {
+            a: [0., 0.],
+            b: [length, 0.],
+            width,
+            color,
+        };
+        let dark = [0.25, 0.2, 0.15];
+        let mut lines = vec![
+            make(3., 0.125, [1.; 3]),
+            make(30., 1., dark),
+            make(40., 1., dark),
+        ];
+        assert_eq!(grid_border(&lines), Some((0.125, dark)));
+        lines.reverse();
+        assert_eq!(grid_border(&lines), Some((0.125, dark)));
+        assert_eq!(grid_border(&[make(20., 1., [1.; 3])]), Some((1., [1.; 3])));
+    }
     #[test]
     fn simple_fraction_stays_native_while_complex_math_requires_source_preservation() {
         let small = sample("1", false).remove(0);

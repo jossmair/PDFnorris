@@ -154,6 +154,15 @@ pub fn recognize(rgba: &[u8], width: u32, height: u32) -> Result<Recognition> {
                 height as f32 / ph as f32,
             );
         }
+        if result
+            .lines
+            .iter()
+            .any(|l| l.words.windows(2).any(enhancement::close_pair))
+            && let Some(dark) = enhancement::dark_paper(rgba)
+            && let Ok(check) = windows_recognize(&dark, width, height)
+        {
+            enhancement::confirm_joined_words(&mut result, &check);
+        }
         enhancement::repair_degrees(rgba, width, height, &mut result);
         recover_labels(rgba, width, height, &mut result);
         enhancement::numeric_grid_context(&mut result);
