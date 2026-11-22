@@ -14,15 +14,15 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.10/PDFnorris-1.0.10-Setup.exe"><img src="assets/telecharger-installateur.svg" alt="Installer PDFnorris V1.10 pour Windows" width="310"></a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.11/PDFnorris-1.0.11-Setup.exe"><img src="assets/telecharger-installateur.svg" alt="Installer PDFnorris V1.11 pour Windows" width="310"></a>
   &nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.10/PDFnorris-1.0.10-portable-exe-windows-x64.zip"><img src="assets/telecharger-portable.svg" alt="Télécharger le ZIP portable V1.10" width="310"></a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.11/PDFnorris-1.0.11-portable-exe-windows-x64.zip"><img src="assets/telecharger-portable.svg" alt="Télécharger le ZIP portable V1.11" width="310"></a>
 </p>
 
 <p align="center">
-  <strong>V1.10</strong> &nbsp;·&nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/tag/v1.10">Les nouveautés</a> &nbsp;·&nbsp;
-  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.10/SHA256SUMS.txt">Empreintes SHA-256</a> &nbsp;·&nbsp;
+  <strong>V1.11</strong> &nbsp;·&nbsp;
+  <a href="https://github.com/jossmair/PDFnorris/releases/tag/v1.11">Les nouveautés</a> &nbsp;·&nbsp;
+  <a href="https://github.com/jossmair/PDFnorris/releases/download/v1.11/SHA256SUMS.txt">Empreintes SHA-256</a> &nbsp;·&nbsp;
   <a href="#bien-démarrer">Bien démarrer</a>
 </p>
 
@@ -98,7 +98,7 @@ Dans Lecture, utilisez l’icône plein écran ou **F11**. La main est activée 
 
 | **Sur votre PC** | **À emporter** |
 | :--- | :--- |
-| [Téléchargez l’installeur Windows](https://github.com/jossmair/PDFnorris/releases/download/v1.10/PDFnorris-1.0.10-Setup.exe), puis suivez l’assistant. | [Téléchargez le ZIP portable](https://github.com/jossmair/PDFnorris/releases/download/v1.10/PDFnorris-1.0.10-portable-exe-windows-x64.zip), puis extrayez-le entièrement. |
+| [Téléchargez l’installeur Windows](https://github.com/jossmair/PDFnorris/releases/download/v1.11/PDFnorris-1.0.11-Setup.exe), puis suivez l’assistant. | [Téléchargez le ZIP portable](https://github.com/jossmair/PDFnorris/releases/download/v1.11/PDFnorris-1.0.11-portable-exe-windows-x64.zip), puis extrayez-le entièrement. |
 | Installation pour votre compte utilisateur. | Lancez **PDFnorris.exe** dans le dossier extrait et gardez **LICENCES.txt** à ses côtés. |
 
 **Windows 10 / 11, 64 bits.** Aucun compte ni abonnement n’est nécessaire.
@@ -113,7 +113,7 @@ L’OCR utilise les langues compatibles installées dans Windows.
 - La limite d’ouverture de cette version est de 256 Mio.
 - Le traitement du clic molette a été repris dans la V1.01. Le test physique avec la souris à l’origine du signalement reste à confirmer.
 
-[Notes de version](https://github.com/jossmair/PDFnorris/releases/tag/v1.10) · [Vérifications détaillées](VALIDATION.md)
+[Notes de version](https://github.com/jossmair/PDFnorris/releases/tag/v1.11) · [Vérifications détaillées](VALIDATION.md)
 
 </details>
 
@@ -124,13 +124,13 @@ Indiquez la version et les étapes à reproduire ; utilisez un exemple sans donn
 
 Le code Rust, les tests et les ressources sont disponibles dans ce dépôt.
 
-[Sources V1.10](https://github.com/jossmair/PDFnorris/tree/v1.10) · [Compiler le logiciel](BUILDING.md) · [Contribuer](CONTRIBUTING.md) · [Feuille de route](ROADMAP.md) · [Sécurité](SECURITY.md)
+[Sources V1.11](https://github.com/jossmair/PDFnorris/tree/v1.11) · [Compiler le logiciel](BUILDING.md) · [Contribuer](CONTRIBUTING.md) · [Feuille de route](ROADMAP.md) · [Sécurité](SECURITY.md)
 
 ---
 
 <p align="center">
   <strong>Prêt à reprendre la main sur vos PDF ?</strong><br><br>
-  <a href="https://github.com/jossmair/PDFnorris/releases/latest"><strong>Télécharger PDFnorris V1.10 →</strong></a>
+  <a href="https://github.com/jossmair/PDFnorris/releases/latest"><strong>Télécharger PDFnorris V1.11 →</strong></a>
 </p>
 
 <p align="center"><sub>Un logiciel de la suite Ergonatus. Issu de <a href="https://github.com/jossmair/PDFinator">PDFinator</a>.<br>Les licences et attributions des composants sont conservées dans les distributions.</sub></p>

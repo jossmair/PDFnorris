@@ -1,5 +1,12 @@
 # PDFnorris — notes de version
 
+## V1.11 — Paragraphes OCR et texte vertical
+
+- Le double-clic sur une image crée directement les blocs modifiables, avec annulation possible.
+- Les lignes qui prolongent une même phrase peuvent former un seul bloc. PDFnorris garde les retours à la ligne et utilise une taille de texte commune lorsque l’alignement, l’interligne et le style sont compatibles.
+- Le moteur OCR lit les images transparentes sur fond blanc pour conserver le contraste des lettres.
+- Le texte vertical reste dans son axe pendant la saisie, le placement du curseur et la sélection. L’orientation est conservée à la réouverture du PDF.
+
 ## V1.10 — OCR, détection de texte et exports Office
 
 - Sur les scans sombres, l’OCR local vérifie certains mots fragmentés avec une seconde normalisation du contraste.
