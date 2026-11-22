@@ -1,5 +1,14 @@
 # PDFnorris — notes de version
 
+## V1.10 — OCR, détection de texte et exports Office
+
+- Sur les scans sombres, l’OCR local vérifie certains mots fragmentés avec une seconde normalisation du contraste.
+- La détection distingue les groupes de mots de colonnes éloignées, même lorsque le moteur les renvoie de droite à gauche.
+- Les paragraphes autour des dessins vectoriels peuvent rester éditables dans Word et Writer. Les tabulations sont exportées comme de vraies tabulations.
+- Les exports DOCX et ODT conservent mieux la couleur des bordures de tableaux quand plusieurs couleurs de traits coexistent.
+- PDFnorris protège le texte servant de masque de découpe pendant l’édition native. La navigation clavier indique plus clairement le focus dans les pages et les dialogues.
+- Les schémas et les formules complexes peuvent conserver des parties graphiques. Relisez les titres décoratifs et les tableaux après conversion.
+
 ## V1.09 — aide claire et compacte
 
 - Fond et en-tête blancs, titre foncé et commande illustrée pour reprendre un document.

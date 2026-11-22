@@ -1,7 +1,7 @@
 {
   "target": "x86_64-pc-windows-msvc",
-  "executable_sha256": "08592f9cceee4ed25d40970b4365f14c1756e0e16ef642c7ae60156471ecab68",
-  "cargo_lock_sha256": "fea3c02340b9ffd03e74a6b9a812450edf98ec67395db1f155f61adce3df67c0",
+  "executable_sha256": "108aea4034ce0ef6fa63d0bda01a81ce28aaf8d8837f7556a5fcb878f88df70d",
+  "cargo_lock_sha256": "d1213a34005210590242a827f7726581709f587a48ba21bec7d2f310b6550f5c",
   "normal_packages": 261,
   "unique_documents": 154,
   "embedded_fonts": [
@@ -1124,7 +1124,7 @@
     },
     {
       "package": "pdfnorris",
-      "version": "1.0.9",
+      "version": "1.0.10",
       "declared": "MIT OR Apache-2.0",
       "documents": [
         "e83915bdbe28b6db2058201575695d286fb3430966ac8e355b03272894bc07e9"
