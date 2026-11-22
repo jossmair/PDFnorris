@@ -26,7 +26,7 @@ pub(super) fn blocks(lines: &[Line]) -> Vec<Block> {
         for word in words {
             let height = (word.rect[3] - word.rect[1]).max(1.);
             let join = current.as_ref().is_some_and(|b| {
-                word.rect[0] - b.rect[2] < height * 1.7
+                (word.rect[0] - b.rect[2]).max(b.rect[0] - word.rect[2]) < height * 1.7
                     && ((word.rect[1] + word.rect[3] - b.rect[1] - b.rect[3]) / 2.).abs()
                         < height * 0.6
             });
@@ -262,6 +262,24 @@ pub fn erase_letters(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn backwards_word_order_preserves_neighbors_and_separates_distant_columns() {
+        let word = |text: &str, x: f32| super::Word {
+            text: text.into(),
+            rect: [x, 0., x + 20., 10.],
+        };
+        let line = super::Line {
+            text: "A B C".into(),
+            rect: [5., 0., 225., 10.],
+            words: vec![word("A", 205.), word("B", 180.), word("C", 5.)],
+        };
+        let blocks = super::blocks(&[line]);
+        assert_eq!(
+            blocks.iter().map(|b| b.text.as_str()).collect::<Vec<_>>(),
+            ["A B", "C"]
+        );
+        assert_eq!(blocks[0].rect, [180., 0., 225., 10.]);
+    }
     use super::*;
     #[test]
     fn separate_labels_keep_their_positions_and_the_diagram_remains_in_the_background() {
