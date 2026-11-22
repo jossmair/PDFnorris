@@ -617,6 +617,28 @@ mod tests {
     }
     #[test]
     #[cfg(windows)]
+    fn first_pass_reads_french_letters_over_a_transparent_background() {
+        let doc = pdfcraft_create::from_text("", "Été français 2026", (420., 160.), 20.).unwrap();
+        let bytes = pdfcraft_cos::write_full(&doc, &Default::default()).unwrap();
+        let mut renderer =
+            pdfcraft_render::PageRenderer::new(std::sync::Arc::new(bytes), Default::default());
+        let image = renderer.render(pdfcraft_render::RenderRequest {
+            page: 0,
+            scale: 2.,
+            ..Default::default()
+        });
+        let mut pixels = image.rgba.to_vec();
+        for pixel in pixels.as_chunks_mut::<4>().0 {
+            *pixel = [0, 0, 0, 255 - pixel[0]];
+        }
+        let first = windows_recognize(&pixels, image.width, image.height).unwrap();
+        assert_eq!(first.text().trim(), "Été français 2026");
+        let complete = crate::ocr::recognize(&pixels, image.width, image.height).unwrap();
+        assert_eq!(complete.text().trim(), "Été français 2026");
+    }
+
+    #[test]
+    #[cfg(windows)]
     fn faint_french_scan_with_uneven_paper_keeps_accents_and_numbers() {
         let d = pdfcraft_create::from_text("", "Été français 2026", (420., 160.), 20.).unwrap();
         let bytes = pdfcraft_cos::write_full(&d, &Default::default()).unwrap();

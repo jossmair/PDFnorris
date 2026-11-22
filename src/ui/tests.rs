@@ -4016,6 +4016,82 @@ fn bold_text_can_be_enlarged_with_a_corner_without_crashing_or_losing_its_style(
 }
 
 #[test]
+fn turned_text_is_edited_on_its_axis_and_keeps_its_orientation_on_reopen() {
+    let (ctx, mut app) = setup();
+    use pdfcraft_cos::{Dict, Object, Stream};
+    let mut doc = pdfcraft_create::blank(595., 842., 1).unwrap();
+    let page = pdfcraft_model::pages(&doc)[0].obj;
+    let mut font = Dict::new();
+    for (key, name) in [
+        ("Type", "Font"),
+        ("Subtype", "Type1"),
+        ("BaseFont", "Helvetica"),
+    ] {
+        font.set(
+            key.as_bytes().to_vec(),
+            Object::Name(name.as_bytes().to_vec()),
+        );
+    }
+    let mut fonts = Dict::new();
+    fonts.set(b"F1".to_vec(), Object::Dict(font));
+    let mut resources = Dict::new();
+    resources.set(b"Font".to_vec(), Object::Dict(fonts));
+    let stream = doc.add(Stream::flate(
+        Dict::new(),
+        b"0 G 100 600 80 180 re S BT /F1 14 Tf 0 1 -1 0 140 640 Tm (Cibles) Tj ET",
+    ));
+    doc.update_dict(page, |page| {
+        page.set(b"Resources".to_vec(), Object::Dict(resources));
+        page.set(b"Contents".to_vec(), Object::Ref(stream));
+    })
+    .unwrap();
+    app.editor = Some(
+        Editor::from_bytes(pdfcraft_cos::write_full(&doc, &Default::default()).unwrap()).unwrap(),
+    );
+    let selection = app.selection_for(0, Target::Block(0)).unwrap();
+    let mut inline =
+        inline::Inline::new(&ctx, app.editor.as_ref().unwrap(), selection, 1.).unwrap();
+    inline.background.texture = Some(ctx.load_texture(
+        "turned-text-test",
+        egui::ColorImage::filled([1, 1], Color32::WHITE),
+        Default::default(),
+    ));
+    inline.cursor = Some(egui::text::CCursorRange::two(
+        egui::text::CCursor::new(0),
+        egui::text::CCursor::new("Cibles".len()),
+    ));
+    for frame in 0..4 {
+        let input = egui::RawInput {
+            events: if frame == 3 {
+                vec![egui::Event::Text("Domicile".into())]
+            } else {
+                vec![]
+            },
+            ..Default::default()
+        };
+        let mut out = ctx.run_ui(input, |ui| {
+            let rect = Rect::from_min_size(ui.clip_rect().min, egui::vec2(600., 600.));
+            inline.draw(ui, rect, 1.);
+        });
+        if frame == 3 {
+            assert!(out.shapes.iter().any(|shape| matches!(
+                &shape.shape,
+                egui::Shape::Text(text) if (text.angle + std::f32::consts::FRAC_PI_2).abs() < 0.01
+            )));
+        }
+        out.textures_delta.clear();
+    }
+    assert!(inline.screen.height() > inline.screen.width());
+    assert_eq!(inline.selection.draft, "Domicile");
+    app.inline = Some(inline);
+    assert!(app.finish_text(), "{:?}", app.message);
+    let reopened = Editor::from_bytes((*app.editor.as_ref().unwrap().bytes).clone()).unwrap();
+    let blocks = reopened.blocks(0).unwrap();
+    assert!((blocks[0].rotation - 90.).abs() < 0.1);
+    assert_eq!(blocks[0].editor_text, "Domicile");
+}
+
+#[test]
 fn shrinking_text_container_reflows_without_changing_font_size() {
     let (ctx, app) = setup();
     let s = app.selection_for(0, Target::Block(0)).unwrap();

@@ -437,11 +437,16 @@ mod tests {
         let ctx = egui::Context::default();
         let mut app = App::from_context(&ctx, None);
         app.set_workspace(&ctx, Workspace::Edit);
-        let text_doc = pdfcraft_create::from_text(
-            "OCR",
-            "Bonjour Ergonatus 123\nÉcole française : été, à bientôt !",
-            (595., 842.),
-            22.,
+        let mut text_doc = pdfcraft_create::blank(595., 842., 1).unwrap();
+        pdfcraft_edit::add_content(
+            &mut text_doc,
+            0,
+            &Content::Text(AddedText {
+                rect: [48., 670., 540., 780.],
+                text: "Bonjour Ergonatus 123 dans cette\nécole française où il fait beau.".into(),
+                size: 22.,
+                ..Default::default()
+            }),
         )
         .unwrap();
         let bytes = pdfcraft_cos::write_full(&text_doc, &Default::default()).unwrap();
@@ -525,12 +530,18 @@ mod tests {
         }
         assert!(session.rx.is_none(), "OCR timed out");
         assert!(session.error.is_none(), "{:?}", session.error);
+        assert!(
+            session.texture.is_none(),
+            "Direct OCR needs no review texture"
+        );
         assert!(session.text.contains("Ergonatus 123"), "{}", session.text);
         assert!(session.text.contains("française"), "{}", session.text);
-        assert!(
-            session.blocks.len() >= 2,
-            "Each OCR line must keep a separate editable block"
+        assert_eq!(session.blocks.len(), 1, "{:?}", session.blocks);
+        assert_eq!(
+            session.blocks[0].text,
+            "Bonjour Ergonatus 123 dans cette\nécole française où il fait beau."
         );
+        assert!((session.blocks[0].size - 18.8).abs() < 2.0);
         let mut decoder =
             png::Decoder::new(std::io::Cursor::new(session.background.as_ref().unwrap()))
                 .read_info()
@@ -895,7 +906,7 @@ fn recognize(
     let png = pdfnorris::ocr::encode_png(&cleaned, image.width, image.height)?;
     Ok(Detected {
         result,
-        blocks,
+        blocks: pdfnorris::ocr::paragraph_blocks(blocks),
         cleaned,
         png,
         width: image.width,
@@ -922,9 +933,11 @@ impl Session {
                         detected.origin.y + block.rect[3] / detected.scale,
                     ];
                     block.size = (block.size / detected.scale as f64).clamp(3., 96.);
-                    let measured = Family::Helvetica
-                        .width(&block.text, block.size, block.bold, false)
-                        .max(1.);
+                    let measured = block
+                        .text
+                        .lines()
+                        .map(|line| Family::Helvetica.width(line, block.size, block.bold, false))
+                        .fold(1., f64::max);
                     let available = (block.rect[2] - block.rect[0] + 3.) as f64;
                     block.size = block.size.min(block.size * available / measured).max(3.);
                 }
@@ -933,11 +946,13 @@ impl Session {
                     Vec2::new(detected.width as f32, detected.height as f32) / detected.scale,
                 );
                 self.background = Some(detected.png);
-                self.texture = Some(ctx.load_texture(
-                    "recognized-image",
-                    preview(&detected.cleaned, detected.width, detected.height),
-                    egui::TextureOptions::LINEAR,
-                ));
+                if !self.automatic {
+                    self.texture = Some(ctx.load_texture(
+                        "recognized-image",
+                        preview(&detected.cleaned, detected.width, detected.height),
+                        egui::TextureOptions::LINEAR,
+                    ));
+                }
             }
             Err(error) => self.error = Some(error),
         }
@@ -1257,9 +1272,11 @@ impl App {
                                             ui.push_id(index, |ui| {
                                                 ui.horizontal(|ui| {
                                                     ui.label(format!("{}", index + 1));
+                                                    let rows = block.text.lines().count().max(1);
                                                     ui.add_sized(
                                                         [ui.available_width() - 48., 26.],
-                                                        egui::TextEdit::singleline(&mut block.text),
+                                                        egui::TextEdit::multiline(&mut block.text)
+                                                            .desired_rows(rows),
                                                     );
                                                 });
                                                 ui.horizontal(|ui| {

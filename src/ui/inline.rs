@@ -23,6 +23,12 @@ pub struct Inline {
     pub(super) legacy_grouping: bool,
 }
 impl Inline {
+    fn turned_angle(&self) -> Option<f32> {
+        let angle = f64::from(self.view.rotation) - self.source.as_ref()?.rotation;
+        let angle = (angle + 180.).rem_euclid(360.) - 180.;
+        (angle.abs() > 0.1).then(|| angle.to_radians() as f32)
+    }
+
     pub fn new(
         ctx: &egui::Context,
         editor: &pdfnorris::document::Editor,
@@ -141,12 +147,13 @@ impl Inline {
         zoom: f32,
         width: f32,
     ) -> Option<Arc<egui::Galley>> {
-        self.fonts_ready(ui.ctx())
+        (self.turned_angle().is_none() && self.fonts_ready(ui.ctx()))
             .then(|| self.layout_ready(ui, text, zoom, width))
     }
     fn layout_ready(&self, ui: &egui::Ui, text: &str, zoom: f32, width: f32) -> Arc<egui::Galley> {
         let s = &self.selection;
-        if self.reflow
+        if self.turned_angle().is_some()
+            || self.reflow
             || !s.rich.is_empty()
             || s.typing != Default::default()
             || s.line_spacing.is_some()
@@ -547,10 +554,15 @@ impl Inline {
             return None;
         }
         let local = self.selection.view_rect(&self.view);
-        let origin = page_rect.min + local.min.to_vec2() * zoom;
-        let mut width = local.width().max(4.0) * zoom;
+        let mut origin = page_rect.min + local.min.to_vec2() * zoom;
+        let mut width = local.width().max(4.) * zoom;
         let text = self.selection.draft.clone();
-        if self.source.as_ref().is_some_and(|b| b.rows.len() == 1)
+        let angle = self.turned_angle();
+        let rotation = egui::emath::Rot2::from_angle(angle.unwrap_or(0.));
+        if angle.is_some() {
+            let natural = self.layout_ready(ui, &text, zoom, f32::INFINITY).size().x;
+            width = natural.max(local.width().max(local.height()) * zoom);
+        } else if self.source.as_ref().is_some_and(|b| b.rows.len() == 1)
             && text != self.original
             && !text.contains('\n')
         {
@@ -560,24 +572,81 @@ impl Inline {
                 .min((page_rect.right() - origin.x - 12.).max(width));
         }
         let galley = self.layout_ready(ui, &text, zoom, width);
-        self.screen = Rect::from_min_size(
-            origin,
-            Vec2::new(
-                width.max(galley.size().x),
-                galley.size().y.max(local.height() * zoom),
-            ),
-        );
+        let height = if angle.is_some() {
+            galley.size().y.max(4.)
+        } else {
+            galley.size().y.max(local.height() * zoom)
+        };
+        if angle.is_some()
+            && let Some(first) = self
+                .source
+                .as_ref()
+                .and_then(|block| block.rows.first())
+                .and_then(|row| row.first())
+                .and_then(|index| self.lines.get(*index))
+        {
+            let [x, y] = first.baseline();
+            let [x, y] = self.view.user_to_view(x as f32, y as f32);
+            let baseline = galley
+                .rows
+                .first()
+                .and_then(|row| row.row.glyphs.first().map(|glyph| row.pos.y + glyph.pos.y))
+                .unwrap_or(height * 0.8);
+            origin = page_rect.min + Vec2::new(x, y) * zoom - rotation * Vec2::new(0., baseline);
+        }
+        let bounds = Rect::from_min_size(Pos2::ZERO, Vec2::new(width.max(galley.size().x), height));
+        self.screen = [
+            bounds.left_top(),
+            bounds.right_top(),
+            bounds.left_bottom(),
+            bounds.right_bottom(),
+        ]
+        .into_iter()
+        .fold(Rect::NOTHING, |rect, point| {
+            rect.union(Rect::from_min_max(
+                origin + rotation * point.to_vec2(),
+                origin + rotation * point.to_vec2(),
+            ))
+        });
+        let paint = |ui: &egui::Ui, galley| {
+            ui.painter().with_clip_rect(page_rect).add(
+                egui::epaint::TextShape::new(origin, galley, Color32::BLACK)
+                    .with_angle(angle.unwrap_or(0.)),
+            );
+        };
         if self.committed {
-            ui.painter().galley(origin, galley, Color32::BLACK);
+            paint(ui, galley);
             return Some(self.screen);
         }
         // The UI text widget collapses a selection when a property control takes
         // focus. Restore its last focused caret/selection before returning to it.
         let id = egui::Id::new("direct-text");
+        if angle.is_some() {
+            let drag = ui.input(|input| {
+                let pointer = &input.pointer;
+                let start = pointer.press_origin()?;
+                let end = pointer.interact_pos()?;
+                (pointer.primary_down()
+                    && (pointer.primary_pressed() || pointer.delta() != Vec2::ZERO)
+                    && self.screen.intersect(ui.clip_rect()).contains(start))
+                .then_some((start, end))
+            });
+            if let Some((start, end)) = drag {
+                let cursor_at = |p| galley.cursor_from_pos(rotation.inverse() * (p - origin));
+                self.cursor = Some(egui::text::CCursorRange::two(
+                    cursor_at(start),
+                    cursor_at(end),
+                ));
+                self.focus = true;
+            }
+        }
         if self.focus {
             if self.cursor.is_none() {
                 self.cursor = self.initial_pointer.take().map(|point| {
-                    egui::text::CCursorRange::one(galley.cursor_from_pos(point * zoom))
+                    let point = page_rect.min + (local.min.to_vec2() + point) * zoom;
+                    egui::text::CCursorRange::one(
+                        galley.cursor_from_pos(rotation.inverse() * (point - origin)),
+                    )
                 });
             }
             if let Some(cursor) = self.cursor {
@@ -590,13 +659,26 @@ impl Inline {
         let mut layouter = |ui: &egui::Ui, text: &dyn egui::TextBuffer, wrap: f32| {
             self.layout_ready(ui, text.as_str(), zoom, wrap)
         };
+        // Keep egui's input, selection and clipboard handling, then paint its galley
+        // and caret in the PDF's coordinates for a turned block.
+        let widget_origin = if angle.is_some() {
+            ui.clip_rect().right_top()
+        } else {
+            origin
+        };
         let mut child = ui.new_child(
             egui::UiBuilder::new()
                 .id_salt("inline-source")
-                .max_rect(Rect::from_min_size(origin, Vec2::new(width, 10000.0)))
+                .max_rect(Rect::from_min_size(
+                    widget_origin,
+                    Vec2::new(width, 10000.0),
+                ))
                 .layout(egui::Layout::top_down(egui::Align::LEFT)),
         );
         child.set_clip_rect(ui.clip_rect().intersect(page_rect));
+        if angle.is_some() {
+            child.set_opacity(0.);
+        }
         let mut output = egui::TextEdit::multiline(&mut buffer)
             .id(id)
             .margin(egui::Margin::ZERO)
@@ -643,6 +725,19 @@ impl Inline {
                         range.as_sorted_char_range().start.0..range.as_sorted_char_range().end.0,
                     )
                 };
+            }
+        }
+        if angle.is_some() {
+            paint(ui, output.galley.clone());
+            if output.response.has_focus()
+                && let Some(cursor) = self.cursor
+            {
+                let caret = output.galley.pos_from_cursor(cursor.primary);
+                let point = |p: Pos2| origin + rotation * p.to_vec2();
+                ui.painter().with_clip_rect(page_rect).line_segment(
+                    [point(caret.left_top()), point(caret.left_bottom())],
+                    ui.visuals().text_cursor.stroke,
+                );
             }
         }
         Some(self.screen)

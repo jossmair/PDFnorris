@@ -4,7 +4,7 @@ mod appearance;
 #[cfg(any(windows, test))]
 mod enhancement;
 mod regions;
-pub use regions::{Block, encode_png, erase_letters};
+pub use regions::{Block, encode_png, erase_letters, paragraph_blocks};
 
 /// Windows reports word boxes in its deskewed image. Bring all four corners
 /// back into the source image before merging recognition passes or erasing ink.
@@ -402,6 +402,34 @@ fn label_context() -> Option<&'static (u32, Vec<u8>)> {
         .as_ref()
 }
 
+#[cfg(any(windows, test))]
+fn windows_pixels(rgba: &[u8]) -> Vec<u8> {
+    let mut bgra = rgba.to_vec();
+    for [red, green, blue, alpha] in bgra.as_chunks_mut::<4>().0 {
+        if *alpha == 255 {
+            std::mem::swap(red, blue);
+            continue;
+        }
+        // Windows ignores alpha in the submitted bitmap. Show transparent
+        // artwork on white paper, as in the PDF, before handing it to OCR.
+        let coverage = u16::from(*alpha);
+        let on_paper =
+            |channel| ((u16::from(channel) * coverage + 255 * (255 - coverage) + 127) / 255) as u8;
+        [*red, *green, *blue] = [on_paper(*blue), on_paper(*green), on_paper(*red)];
+        *alpha = 255;
+    }
+    bgra
+}
+
+#[cfg(test)]
+#[test]
+fn windows_ocr_sees_transparent_pixels_on_white_paper() {
+    assert_eq!(
+        windows_pixels(&[0, 0, 0, 0, 0, 0, 0, 128, 10, 20, 30, 255]),
+        [255, 255, 255, 255, 127, 127, 127, 255, 30, 20, 10, 255]
+    );
+}
+
 #[cfg(windows)]
 fn windows_recognize(rgba: &[u8], width: u32, height: u32) -> Result<Recognition> {
     use windows::{
@@ -425,11 +453,7 @@ fn windows_recognize(rgba: &[u8], width: u32, height: u32) -> Result<Recognition
                 "Image trop grande",
             ));
         }
-        let mut bgra = rgba.to_vec();
-        for pixel in bgra.as_chunks_mut::<4>().0 {
-            pixel.swap(0, 2);
-            pixel[3] = 255;
-        }
+        let bgra = windows_pixels(rgba);
         let writer = DataWriter::new()?;
         writer.WriteBytes(&bgra)?;
         let bitmap = SoftwareBitmap::CreateCopyWithAlphaFromBuffer(

@@ -26,9 +26,11 @@ pub(super) fn blocks(lines: &[Line]) -> Vec<Block> {
         for word in words {
             let height = (word.rect[3] - word.rect[1]).max(1.);
             let join = current.as_ref().is_some_and(|b| {
-                (word.rect[0] - b.rect[2]).max(b.rect[0] - word.rect[2]) < height * 1.7
-                    && ((word.rect[1] + word.rect[3] - b.rect[1] - b.rect[3]) / 2.).abs()
-                        < height * 0.6
+                let previous = b.words[b.words.len() - 1];
+                let scale = height.max(previous[3] - previous[1]);
+                (word.rect[0] - previous[2]).max(previous[0] - word.rect[2]) < scale * 1.7
+                    && ((word.rect[1] + word.rect[3] - previous[1] - previous[3]) / 2.).abs()
+                        < scale * 0.6
             });
             if !join && let Some(b) = current.take() {
                 result.push(b);
@@ -58,7 +60,54 @@ pub(super) fn blocks(lines: &[Line]) -> Vec<Block> {
             result.push(b);
         }
     }
+    for block in &mut result {
+        let mut heights: Vec<_> = block.words.iter().map(|r| (r[3] - r[1]).max(1.)).collect();
+        heights.sort_by(f32::total_cmp);
+        block.size = f64::from(heights[heights.len() / 2]) * 1.15;
+    }
     result
+}
+
+/// Join uninterrupted prose only when the editable PDF's fixed line spacing
+/// can reproduce the source layout. Keep separate headings, labels and columns.
+pub fn paragraph_blocks(blocks: Vec<Block>) -> Vec<Block> {
+    let mut paragraphs: Vec<Block> = Vec::with_capacity(blocks.len());
+    for next in blocks {
+        if let Some(previous) = paragraphs.last_mut()
+            && previous.text.rsplit('\n').next().is_some_and(|line| {
+                line.split_whitespace()
+                    .filter(|word| word.chars().any(char::is_alphabetic))
+                    .count()
+                    >= 3
+                    && !line.trim_end().ends_with(['.', '!', '?', ':', ';'])
+            })
+            && next.text.chars().next().is_some_and(char::is_lowercase)
+            && next.text.split_whitespace().count() >= 2
+        {
+            let size = previous.size as f32;
+            let rows = previous.text.lines().count() as f32;
+            let predicted_top = previous.rect[1] + rows * 1.2 * size;
+            if (next.rect[1] - predicted_top).abs() <= size * 0.16
+                && (next.rect[0] - previous.rect[0]).abs() <= size * 0.3
+                && (next.size - previous.size).abs() <= previous.size * 0.12
+                && next.bold == previous.bold
+                && next
+                    .color
+                    .iter()
+                    .zip(previous.color)
+                    .all(|(a, b)| (a - b).abs() <= 0.12)
+            {
+                previous.text.push('\n');
+                previous.text.push_str(&next.text);
+                previous.rect[2] = previous.rect[2].max(next.rect[2]);
+                previous.rect[3] = previous.rect[3].max(next.rect[3]);
+                previous.words.extend(next.words);
+                continue;
+            }
+        }
+        paragraphs.push(next);
+    }
+    paragraphs
 }
 pub fn encode_png(rgba: &[u8], width: u32, height: u32) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
@@ -262,6 +311,31 @@ pub fn erase_letters(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn prose_continuation_keeps_one_font_size_and_respects_columns() {
+        let block = |text: &str, x, y, size| super::Block {
+            text: text.into(),
+            rect: [x, y, x + 135., y + 12.],
+            size,
+            bold: false,
+            color: [0.; 3],
+            words: vec![[x, y, x + 135., y + 12.]],
+        };
+        let result = super::paragraph_blocks(vec![
+            block("Le texte de cette image", 20., 10., 14.),
+            block("continue sur la ligne suivante.", 21., 27., 14.5),
+            block("autre colonne à droite", 170., 44., 14.),
+        ]);
+        assert_eq!(result.len(), 2);
+        assert_eq!(
+            result[0].text,
+            "Le texte de cette image\ncontinue sur la ligne suivante."
+        );
+        assert_eq!(result[0].size, 14.);
+        assert_eq!(result[0].words.len(), 2);
+        assert_eq!(result[1].rect[0], 170.);
+    }
+
     #[test]
     fn backwards_word_order_preserves_neighbors_and_separates_distant_columns() {
         let word = |text: &str, x: f32| super::Word {
